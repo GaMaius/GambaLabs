@@ -49,6 +49,7 @@ class Api:
         self._window = None
         self._chat = None
         self.theme = "gamba"
+        self._rembg_session = None   # 배경 제거 세션(최초 사용 시 로드·재사용)
 
     # ── 파일 다이얼로그 ─────────────────────────────
     def pick_file(self, kind="doc"):
@@ -308,8 +309,15 @@ class Api:
         except Exception as e:
             return {"error": str(e)}
 
+    def _remove_bg(self, im):
+        """rembg(U²-Net)로 배경 제거 → 투명 배경 RGBA 반환. 세션은 최초 1회 로드·재사용."""
+        from rembg import remove, new_session
+        if self._rembg_session is None:
+            self._rembg_session = new_session("u2netp")   # 경량 모델(빠름·소용량)
+        return remove(im, session=self._rembg_session).convert("RGBA")
+
     # ── 벡터 변환: 비트맵 → SVG (visioncortex/vtracer) ──
-    def vectorize(self, image_path, colormode="color", mode="spline", filter_speckle=4):
+    def vectorize(self, image_path, colormode="color", mode="spline", filter_speckle=4, remove_bg=False):
         import subprocess
         if not image_path or not os.path.exists(image_path):
             return {"error": "이미지를 선택하세요."}
@@ -345,6 +353,13 @@ class Api:
                 sc = MAX / max(w, h)
                 im = im.resize((max(1, int(w * sc)), max(1, int(h * sc))))
                 downscaled = True
+            removed = False
+            if remove_bg:   # 원할 때만: 배경 제거(투명) 후 벡터화 → 피사체만 깔끔히
+                try:
+                    im = self._remove_bg(im)
+                    removed = True
+                except Exception as e:
+                    return {"error": f"배경 제거 실패({type(e).__name__}: {e}). 'pip install rembg[cpu]' 확인."}
             try:  # 색이 매우 많으면(사진) 속도·용량 위해 잡티 제거 강화
                 if colormode == "color" and len(im.getcolors(maxcolors=20000) or [1] * 20001) > 6000:
                     noisy = True
@@ -383,6 +398,6 @@ class Api:
                 except Exception:
                     pass
             return {"out": out, "svg": svg, "preview": preview, "downscaled": downscaled,
-                    "noisy": noisy, "in_size": in_size, "out_size": out_size}
+                    "noisy": noisy, "removed_bg": removed, "in_size": in_size, "out_size": out_size}
         except Exception as e:
             return {"error": str(e)}

@@ -32,7 +32,7 @@ UI = os.path.join(HERE, "ui", "index.html")
 def main():
     api = Api()
     window = webview.create_window(
-        "감바랩스 오피스 AI",
+        "GambaLabs Office",
         UI,
         js_api=api,
         width=1180,

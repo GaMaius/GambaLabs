@@ -6,3 +6,4 @@ Pillow>=10.0.0
 vtracer
 pillow-heif
 pillow-avif-plugin
+rembg[cpu]

@@ -30,44 +30,86 @@ def _download(url, query):
     return path
 
 
-def fetch_image(query: str):
-    """질의로 스톡 이미지 1장 검색·다운로드 → 로컬 경로. 실패/미설정 시 None."""
-    if not query:
-        return None
+_QCACHE = {}
+
+
+def _english_query(q: str) -> str:
+    """스톡 API는 영어 기반 → 한글 질의를 영어 키워드로 번역(LLM, 캐시). 실패 시 원문."""
+    q = (q or "").strip()
+    if not q or not re.search(r"[가-힣]", q):
+        return q
+    if q in _QCACHE:
+        return _QCACHE[q]
+    eng = q
+    if os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_BASE_URL"):
+        try:
+            from openai import OpenAI
+            c = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "ollama",
+                       base_url=os.getenv("OPENAI_BASE_URL"), timeout=25)
+            r = c.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o"), temperature=0,
+                messages=[{"role": "user", "content":
+                           "Convert to 2-4 concise English stock-photo search keywords. "
+                           f"Output ONLY the keywords, nothing else.\n\n{q}"}])
+            cand = re.sub(r"\s+", " ", r.choices[0].message.content.strip().strip('".')).strip()
+            if cand:
+                eng = cand[:60]
+        except Exception:
+            pass
+    _QCACHE[q] = eng
+    return eng
+
+
+def _search_url(query: str):
+    """스톡 서비스에서 가로·고화질 사진 URL 1개. 우선순위 Unsplash→Pexels→Openverse."""
     import requests
-    uk = os.getenv("UNSPLASH_ACCESS_KEY")
-    pk = os.getenv("PEXELS_API_KEY")
+    uk, pk = os.getenv("UNSPLASH_ACCESS_KEY"), os.getenv("PEXELS_API_KEY")
     try:
         if uk:
             r = requests.get("https://api.unsplash.com/search/photos",
-                             params={"query": query, "per_page": 1, "orientation": "landscape"},
+                             params={"query": query, "per_page": 12, "orientation": "landscape",
+                                     "order_by": "relevant", "content_filter": "high"},
                              headers={"Authorization": f"Client-ID {uk}"}, timeout=20)
             r.raise_for_status()
-            results = r.json().get("results", [])
-            if results:
-                return _download(results[0]["urls"]["regular"], query)
+            res = r.json().get("results", [])
+            if res:
+                return res[0]["urls"]["regular"]
         elif pk:
             r = requests.get("https://api.pexels.com/v1/search",
-                             params={"query": query, "per_page": 1, "orientation": "landscape"},
+                             params={"query": query, "per_page": 15, "orientation": "landscape",
+                                     "size": "large"},
                              headers={"Authorization": pk}, timeout=20)
             r.raise_for_status()
-            photos = r.json().get("photos", [])
-            if photos:
-                return _download(photos[0]["src"]["large"], query)
+            ph = r.json().get("photos", [])
+            if ph:  # 가로 비율 우선(관련도 상위 중)
+                ph.sort(key=lambda p: 0 if p.get("width", 0) >= p.get("height", 1) else 1)
+                return ph[0]["src"].get("large2x") or ph[0]["src"]["large"]
     except Exception as e:
-        print(f"[image_search] 키 기반 검색 실패({e}) → Openverse 시도")
-    # 폴백: Openverse (키 불필요, CC·상업적 사용 가능)
-    try:
+        print(f"[image_search] 키 기반 검색 실패({e}) → Openverse")
+    try:  # 폴백: Openverse (키 불필요, CC 상업적 사용)
         r = requests.get("https://api.openverse.org/v1/images/",
-                         params={"q": query, "page_size": 1, "license_type": "commercial"},
+                         params={"q": query, "page_size": 8, "license_type": "commercial",
+                                 "aspect_ratio": "wide", "size": "large"},
                          headers={"User-Agent": "GambaLabsOfficeAI/1.0"}, timeout=20)
         r.raise_for_status()
-        results = r.json().get("results", [])
-        if results:
-            return _download(results[0].get("url") or results[0].get("thumbnail"), query)
+        res = r.json().get("results", [])
+        if res:
+            return res[0].get("url") or res[0].get("thumbnail")
     except Exception as e:
-        print(f"[image_search] Openverse 실패({e}) → 플레이스홀더")
+        print(f"[image_search] Openverse 실패({e})")
     return None
+
+
+def fetch_image(query: str):
+    """질의 → 영어 번역 → 스톡 검색·다운로드 → 원본 사진 경로. 실패 시 None.
+    (PPT 삽입용 사진은 원본 그대로 — 자동 SVG 변환은 하지 않음. 벡터화는 '벡터 변환' 탭에서 수동으로.)"""
+    if not query:
+        return None
+    eng = _english_query(query)
+    url = _search_url(eng)
+    if not url:
+        return None
+    return _download(url, eng)
 
 
 def available():
