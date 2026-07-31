@@ -1,0 +1,7 @@
+node_modules/
+.env
+__pycache__/
+*.pyc
+output/
+inbox/_processed/
+app/ppt/_gradcache/

@@ -1,0 +1,36 @@
+# ── 비밀/환경 (절대 커밋 금지) ──
+.env
+**/.env
+*.key
+
+# ── 파이썬 ──
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ── Node ──
+node_modules/
+**/node_modules/
+
+# ── 생성물/캐시 ──
+gambalabs-office-automation/output/
+**/_gradcache/
+**/_images/
+
+# ── 세션/IDE ──
+.claude/
+.cursor/
+.vscode/
+.antigravity/
+.antigravity-ide/
+.idea/
+
+# ── OS/스크래치 ──
+Thumbs.db
+desktop.ini
+ForTest.png
+테스트용2.png
+claude_skills/

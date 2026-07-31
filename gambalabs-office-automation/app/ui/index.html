@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>감바랩스 오피스 AI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><img id="brandLogo" src="assets/logo_white.png" alt="Gamba Labs"></div>
+    <div class="sub" style="padding:0 6px 16px;font-size:12px;color:var(--ink-muted);font-weight:600">Office AI 자동화</div>
+    <nav class="nav">
+      <button data-tab="ppt" class="active"><span class="dot" style="background:var(--purple)"></span> 발표자료</button>
+      <button data-tab="data"><span class="dot" style="background:var(--teal)"></span> 데이터 &amp; 차트</button>
+      <button data-tab="vector"><span class="dot" style="background:var(--orange)"></span> 벡터 변환</button>
+    </nav>
+    <div class="spacer"></div>
+    <button id="themeBtn" class="btn btn-util" style="margin-bottom:10px;width:100%">☀️ 라이트로</button>
+    <label style="font-size:11px;color:var(--ink-faint);display:block;margin-bottom:3px">AI 모델</label>
+    <select id="modelSel" class="modelsel" onchange="onModelChange()"></select>
+    <div class="status" style="margin-top:10px">엔진 · <b id="llmStatus">…</b><br>이미지 · <b id="imgStatus">…</b></div>
+  </aside>
+
+  <main class="content">
+    <!-- 발표자료 -->
+    <section class="tab active" id="tab-ppt">
+      <div class="head"><h1>발표자료</h1><p>제작자가 내용·구성을 정하면, 툴이 브랜드 디자인을 입힙니다.</p></div>
+      <div class="toolbar">
+        <div class="seg"><button class="on" data-m="auto" onclick="pptMode('auto')">풀 자동 생성</button><button id="segSpec" data-m="spec" onclick="pptMode('spec')">디자인 보조 (스펙)</button><button data-m="chat" onclick="pptMode('chat')">AI 대화형</button><button data-m="import" onclick="pptMode('import')">PPT 입력</button></div>
+        <div class="themepick"><span class="themepick-label">🎨 디자인 테마</span><select id="themeSel" class="modelsel" onchange="onThemeChange()"></select><button class="iconbtn" onclick="openThemeModal()" title="테마 추가·제작">＋</button><button class="iconbtn danger hidden" id="themeDelBtn" onclick="deleteCurrentTheme()" title="현재 커스텀 테마 삭제">🗑</button></div>
+      </div>
+      <div class="advbar"><button id="specToggle" class="linkbtn" onclick="toggleSpec()"></button></div>
+
+      <div id="ppt-auto">
+        <div class="card">
+          <h3><span class="step-no">1</span> 문서 선택</h3>
+          <div class="hint">문서 전체를 브랜드 덱으로 자동 구성 (md·txt).</div>
+          <div class="row"><button class="btn btn-util" onclick="pickPpt()">문서 선택</button><div class="pathbox empty" id="pptPath">선택된 문서 없음</div></div>
+          <label class="toggle"><input type="checkbox" id="autoLLM"> <span><b>AI 구조화 (Ollama)</b> — LLM이 문서를 읽고 슬라이드로 나눔. 끄면 제목(##) 기준 규칙 분할(즉시). <span class="warn">켜면 로컬 모델이라 수십 초~수 분</span></span></label>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">2</span> 구성 미리보기 <span style="flex:1"></span><button class="btn btn-ghost" onclick="previewPpt()">미리보기</button></h3>
+          <div id="pptOutline" class="result hidden"></div>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">3</span> 생성</h3>
+          <div class="row"><button class="btn btn-primary" id="pptGoBtn" onclick="makePpt()">발표자료 생성</button></div>
+          <div id="pptResult" class="result hidden"></div>
+        </div>
+      </div>
+
+      <div id="ppt-spec" class="hidden">
+        <div class="card">
+          <h3><span class="step-no">1</span> 슬라이드 스펙</h3>
+          <div class="hint">내용·구성·강조는 당신이. 디자인·차트·이미지는 툴이. <span class="mono">[차트: 막대, 데이터=..]</span> <span class="mono">[이미지: 설명, 배경]</span> <span class="mono">[강조]</span></div>
+          <textarea id="specText" style="min-height:220px"></textarea>
+          <div class="row" style="margin-top:8px"><button class="btn btn-ghost" onclick="fillSpecSample()">예시 채우기</button></div>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">2</span> 구성 미리보기 <span style="flex:1"></span><button class="btn btn-ghost" onclick="previewSpec()">미리보기</button></h3>
+          <div id="specOutline" class="result hidden"></div>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">3</span> 생성</h3>
+          <div class="row"><button class="btn btn-primary" id="specGoBtn" onclick="makeSpec()">디자인 생성</button></div>
+          <div id="specResult" class="result hidden"></div>
+        </div>
+      </div>
+      <div id="ppt-chat" class="hidden">
+        <div class="chatthread">
+          <div id="chatLog" class="chatlog">
+            <div id="chatEmpty" class="chatempty">
+              <div class="chatempty-ico">◆</div>
+              <h2>무엇을 만들까요?</h2>
+              <p>주제·자료를 적어 보내면, 에이전트가 필요한 걸 <b>질문하며</b> 함께 만들어요. 샘플 확인 후 전체 생성.</p>
+              <div class="chips">
+                <button class="chip" onclick="chatFill('WordSense 기술 소개 발표자료. 투자사 대상, 성능·상용화 강조')">WordSense 투자사 소개</button>
+                <button class="chip" onclick="chatFill('온디바이스 vs 클라우드 KWS 비교 발표자료')">온디바이스 vs 클라우드</button>
+                <button class="chip" onclick="chatFill('실험 결과 리포트 발표자료. 정확도 추이 차트 포함')">실험 결과 리포트</button>
+              </div>
+            </div>
+          </div>
+          <div class="composer">
+            <textarea id="chatInput" rows="1" placeholder="메시지를 입력하세요…  (Enter 전송, Shift+Enter 줄바꿈)" onkeydown="chatKey(event)" oninput="autoGrow(this)"></textarea>
+            <button class="sendbtn" onclick="chatSend()" title="보내기">↑</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="ppt-import" class="hidden">
+        <div class="card">
+          <h3><span class="step-no">1</span> 파워포인트 불러오기</h3>
+          <div class="hint">파워포인트에 <b>내용과 설명</b>을 적어 저장한 파일을 주세요. 위치·설명을 파악해 디자인합니다. (예: "원형차트로 A안 강조", "이 구역에 AI 이미지", "배경에 음성인식 이미지 투명하게")</div>
+          <div class="row"><button class="btn btn-util" onclick="pickImport()">PPTX 선택</button><div class="pathbox empty" id="importPath">선택된 파일 없음</div></div>
+          <label class="toggle"><input type="checkbox" id="importLLM"> <span><b>AI 정밀 해석 (Ollama)</b> — 자유로운 설명까지 이해. 끄면 규칙 기반(즉시). <span class="warn">켜면 로컬 모델이라 수십 초~수 분 소요</span></span></label>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">2</span> 해석 미리보기 <span style="flex:1"></span><button class="btn btn-ghost" onclick="previewImport()">미리보기</button></h3>
+          <div class="hint">적어둔 설명을 어떻게 해석했는지 확인하세요.</div>
+          <div id="importOutline" class="result hidden"></div>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">3</span> 생성</h3>
+          <div class="row"><button class="btn btn-primary" id="importGoBtn" onclick="makeImport()">브랜드 디자인 생성</button></div>
+          <div id="importResult" class="result hidden"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 데이터 & 차트 -->
+    <section class="tab" id="tab-data">
+      <div class="head"><h1>데이터 &amp; 차트</h1><p>실험·재무 결과를 빠르게 기록하고, 수식·차트를 보존합니다.</p></div>
+      <div class="seg"><button class="on" data-m="exp" onclick="dataMode('exp')">실험/재무 기록 + 자동 차트</button><button data-m="dash" onclick="dataMode('dash')">대시보드 수정</button><button data-m="analyze" onclick="dataMode('analyze')">분석/요약</button></div>
+
+      <div id="data-exp">
+        <div class="card" style="border-style:dashed">
+          <h3>⚡ 실험 스크립트에 심기 (가장 간편)</h3>
+          <div class="hint">실험 코드 끝에 아래 한 줄이면 결과가 트래커에 자동 누적 + 차트 갱신 (수동 입력 불필요).</div>
+          <div class="mono" style="background:var(--canvas);border:1px solid var(--hairline);border-radius:6px;padding:10px;white-space:pre-wrap">from gamba_log import log_result
+log_result({"정확도(%)": 92.3, "SNR(dB)": -20, "오인식(건)": 1})</div>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">1</span> 트래커 &amp; 결과 <span style="font-size:12px;color:var(--ink-muted);font-weight:400">(또는 여기에 직접 입력)</span></h3>
+          <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickExp()">트래커 엑셀</button><div class="pathbox empty" id="expPath">선택된 파일 없음</div></div>
+          <div class="hint">결과를 자연어로 적으면 한 줄로 기록하고 추이 차트를 자동 갱신합니다.</div>
+          <textarea id="expText" placeholder="예) 4회차 정확도 92.3%, SNR -20dB, 오인식 1건, 노이즈 강인성 개선"></textarea>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">2</span> 기록 &amp; 차트 갱신</h3>
+          <div class="row"><button class="btn btn-primary" onclick="logExp()">기록 + 자동 차트</button></div>
+          <div id="expResult" class="result hidden"></div>
+        </div>
+      </div>
+
+      <div id="data-dash" class="hidden">
+        <div class="card">
+          <h3><span class="step-no">1</span> 대상 엑셀 &amp; 요청</h3>
+          <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickXlsx()">엑셀 선택</button><div class="pathbox empty" id="xlsxPath">선택된 파일 없음</div></div>
+          <textarea id="reqText" placeholder="예) Polaris 파서 종료일 8월 25일로, 진행상태 지연. 서버 GPU 임차 총 350만원으로"></textarea>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">2</span> 변경 미리보기 <span style="flex:1"></span><button class="btn btn-ghost" onclick="previewExcel()">미리보기</button></h3>
+          <div id="excelPreview" class="hidden"></div>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">3</span> 적용 <span style="font-size:12px;color:var(--ink-muted);font-weight:400">· 수식·차트 보존</span></h3>
+          <div class="row"><button class="btn btn-primary" onclick="applyExcel()">적용</button></div>
+          <div id="excelResult" class="result hidden"></div>
+        </div>
+      </div>
+
+      <div id="data-analyze" class="hidden">
+        <div class="card">
+          <h3><span class="step-no">1</span> 분석할 엑셀</h3>
+          <div class="hint">생성된 실험/재무 엑셀을 LLM이 읽고 요약·추세·이상치·최적조건을 알려줍니다. (pandas로 빠르게 로드)</div>
+          <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickAnalyze()">엑셀 선택</button><div class="pathbox empty" id="analyzePath">선택된 파일 없음</div></div>
+          <textarea id="analyzeQ" placeholder="질문(선택). 비우면 자동 요약. 예) 어느 조건에서 정확도가 가장 높아? 이상치 있어?"></textarea>
+        </div>
+        <div class="card">
+          <h3><span class="step-no">2</span> 분석 <span style="font-size:12px;color:var(--ink-muted);font-weight:400">· LLM 필요(로컬이면 다소 느림)</span></h3>
+          <div class="row"><button class="btn btn-primary" id="analyzeBtn" onclick="analyzeExcel()">분석/요약</button></div>
+          <div id="analyzeResult" class="result hidden"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 벡터 변환 -->
+    <section class="tab" id="tab-vector">
+      <div class="head"><h1>비트맵 → 벡터</h1><p>로고·아이콘·이미지를 확대해도 안 깨지는 SVG 벡터로 변환합니다. (visioncortex vtracer, 로컬 처리)</p></div>
+      <div class="card">
+        <h3><span class="step-no">1</span> 이미지 선택</h3>
+        <div class="hint">PNG·JPG·BMP·GIF·WEBP. 로고·아이콘·단순 일러스트에 가장 잘 맞습니다.</div>
+        <div class="row"><button class="btn btn-util" onclick="pickVec()">이미지 선택</button><div class="pathbox empty" id="vecPath">선택된 이미지 없음</div></div>
+      </div>
+      <div class="card">
+        <h3><span class="step-no">2</span> 옵션</h3>
+        <div class="optrow">
+          <label>색상 모드<select id="vecColor" class="modelsel"><option value="color">컬러</option><option value="binary">흑백(2색)</option></select></label>
+          <label>곡선 방식<select id="vecMode" class="modelsel"><option value="spline">곡선 (spline)</option><option value="polygon">직선 (polygon)</option><option value="pixel">픽셀 (pixel)</option></select></label>
+          <label>잡티 제거<select id="vecSpeckle" class="modelsel"><option value="2">약 (2)</option><option value="4" selected>보통 (4)</option><option value="8">강 (8)</option><option value="16">매우 강 (16)</option></select></label>
+        </div>
+      </div>
+      <div class="card">
+        <h3><span class="step-no">3</span> 변환</h3>
+        <div class="row"><button class="btn btn-primary" id="vecBtn" onclick="vectorize()">SVG로 변환</button></div>
+        <div id="vecResult" class="result hidden"></div>
+        <div id="vecPreview" class="vecprev hidden"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<!-- 테마 추가/제작 모달 -->
+<div id="themeModal" class="modal hidden" onclick="if(event.target===this)closeThemeModal()">
+  <div class="modal-card">
+    <div class="modal-head"><h3>발표자료 테마 추가</h3><button class="modal-x" onclick="closeThemeModal()">✕</button></div>
+    <div class="seg modal-seg"><button class="on" data-tm="build" onclick="themeTab('build')">직접 제작</button><button data-tm="upload" onclick="themeTab('upload')">파일 업로드</button></div>
+
+    <div id="tm-build">
+      <label class="fld">테마 이름<input id="tmName" placeholder="예) 우리팀 블루"></label>
+      <div class="colorgrid">
+        <label>배경<input type="color" id="tmBg" value="#ffffff" oninput="tmPreview()"></label>
+        <label>강조(포인트)<input type="color" id="tmAccent" value="#0038a3" oninput="tmPreview()"></label>
+        <label>텍스트<input type="color" id="tmInk" value="#1a1a1a" oninput="tmPreview()"></label>
+      </div>
+      <label class="chk"><input type="checkbox" id="tmBand" checked onchange="tmPreview()"> 헤더 밴드를 강조색으로 채우기 <span style="color:var(--ink-faint)">(끄면 밝은 밴드 + 밑줄)</span></label>
+      <div class="tmprev" id="tmPrev"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="themeBuild()">이 테마 만들어 적용</button>
+      <div id="tmBuildResult" class="result hidden"></div>
+    </div>
+
+    <div id="tm-upload" class="hidden">
+      <label class="fld">테마 이름<input id="tmUpName" placeholder="예) 우리팀 블루 (비우면 파일명)"></label>
+      <div class="hint">skill로 만든 테마 <b>.json</b> 파일을 선택하세요. 스키마는 <span class="mono">ppt-skill/THEME_AUTHORING.md</span> 참고.</div>
+      <button class="btn btn-primary" style="width:100%" onclick="themeUpload()">테마 파일 선택 후 추가</button>
+      <div id="tmUpResult" class="result hidden"></div>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
