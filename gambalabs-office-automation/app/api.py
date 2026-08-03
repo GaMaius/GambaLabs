@@ -50,6 +50,8 @@ class Api:
         self._chat = None
         self.theme = "gamba"
         self._rembg_session = None   # 배경 제거 세션(최초 사용 시 로드·재사용)
+        self._vec_proc = None        # 진행 중 벡터 변환 프로세스(중지용)
+        self._vec_cancelled = False
 
     # ── 파일 다이얼로그 ─────────────────────────────
     def pick_file(self, kind="doc"):
@@ -309,6 +311,18 @@ class Api:
         except Exception as e:
             return {"error": str(e)}
 
+    def cancel_vectorize(self):
+        """진행 중인 벡터 변환을 즉시 중지(프로세스 kill)."""
+        p = self._vec_proc
+        if p is not None and p.poll() is None:
+            self._vec_cancelled = True
+            try:
+                p.kill()
+            except Exception:
+                pass
+            return {"cancelled": True}
+        return {"cancelled": False}
+
     def _remove_bg(self, im):
         """rembg(U²-Net)로 배경 제거 → 투명 배경 RGBA 반환. 세션은 최초 1회 로드·재사용."""
         from rembg import remove, new_session
@@ -401,17 +415,26 @@ class Api:
             out = os.path.join(OUTPUT, _ts("vector", "svg"))  # 출력은 ASCII 고정명(경로 문제 방지)
             cprec = 8   # 색 정밀도 최대 — 원본에 최대한 가깝게(트레이스는 원리상 포스터화됨)
             runner = os.path.join(HERE, "ppt", "_vtrace_run.py")
-            # 별도 프로세스 + 타임아웃: 어떤 이미지도 무한 대기하지 않음
+            # 별도 프로세스(시간제한 없음) — 오래 걸리면 사용자가 '중지' 버튼으로 취소
+            self._vec_cancelled = False
+            proc = subprocess.Popen(
+                [sys.executable, runner, src, out, str(colormode), str(mode), str(fs), str(cprec)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self._vec_proc = proc
             try:
-                r = subprocess.run(
-                    [sys.executable, runner, src, out,
-                     str(colormode), str(mode), str(fs), str(cprec)],
-                    capture_output=True, text=True, timeout=300)
-            except subprocess.TimeoutExpired:
-                return {"error": "변환이 300초를 넘겨 중단했습니다. '해상도 최대(4000px)'와 '원본색'을 함께 쓰면 색 레이어가 폭증해 매우 느려요. "
-                                 "→ 색 단순화를 '256색'으로 바꾸세요(4000px에서도 빠르고 화질 우수). 또는 해상도를 '높음(1600px)'으로 낮추세요."}
-            if r.returncode != 0 or not os.path.exists(out):
-                return {"error": f"변환 실패: {(r.stderr or '')[-300:]}"}
+                _out_t, err_t = proc.communicate()   # 완료 또는 kill될 때까지 대기(무한 아님: 사용자 취소 가능)
+            finally:
+                self._vec_proc = None
+            if self._vec_cancelled:
+                self._vec_cancelled = False
+                if os.path.exists(out):
+                    try:
+                        os.remove(out)
+                    except Exception:
+                        pass
+                return {"cancelled": True}
+            if proc.returncode != 0 or not os.path.exists(out):
+                return {"error": f"변환 실패: {(err_t or '')[-300:]}"}
 
             out_size = os.path.getsize(out)
             svg, preview = "", False

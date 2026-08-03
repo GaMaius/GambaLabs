@@ -272,11 +272,13 @@ async function pickVec() { const p = await api().pick_file("image"); if (p) { VE
 async function vectorize() {
   if (!VEC) return alert("이미지를 선택하세요.");
   const rmbg = $("vecRmBg").checked;
-  const box = $("vecResult"); spin(box, rmbg ? "배경 제거 후 벡터 변환 중… (첫 사용은 모델 준비로 잠깐)" : "벡터 변환 중… (사진·큰 이미지는 다소 걸릴 수 있어요)"); show(box); $("vecBtn").disabled = true;
+  const box = $("vecResult"); spin(box, (rmbg ? "배경 제거 후 " : "") + "벡터 변환 중… 오래 걸리면 ■ 중지로 취소하세요"); show(box); $("vecBtn").disabled = true;
+  $("vecStop").classList.remove("hidden");
   $("vecPreview").classList.add("hidden");
   try {
     const r = await api().vectorize(VEC, $("vecColor").value, $("vecMode").value, $("vecSpeckle").value, rmbg, $("vecQuant").value, $("vecRes").value);
-    if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); }
+    if (r.cancelled) { show(box, `<span class="err">■ 변환을 중지했습니다.</span>`); }
+    else if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); }
     else {
       const kb = (n) => (n / 1024).toFixed(0) + "KB";
       const dm = r.dims ? ` · ${r.dims[0]}×${r.dims[1]}px` + (r.orig_dims && r.dims[0] === r.orig_dims[0] ? "(원본)" : "") : "";
@@ -290,6 +292,11 @@ async function vectorize() {
     }
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
   $("vecBtn").disabled = false;
+  $("vecStop").classList.add("hidden");
+}
+async function cancelVec() {
+  try { await api().cancel_vectorize(); } catch (e) {}
+  $("vecStop").classList.add("hidden");
 }
 
 /* ── 데이터: 대시보드 수정 ── */
