@@ -130,6 +130,16 @@ table.chg td .to{color:var(--green);font-weight:600}
 .tmband{padding:7px 12px;font-weight:700;font-size:12px}
 .tmbody{padding:14px 14px;position:relative;flex:1}
 .tmbar{width:28px;height:4px;border-radius:2px;margin-bottom:8px}
+/* 사용 가이드 */
+.help-body{max-height:64vh;overflow-y:auto;padding-right:6px}
+.help-lead{font-size:14px;color:var(--ink-2);margin-bottom:14px;line-height:1.55}
+.help-sec{border-top:1px solid var(--hairline);padding:14px 0 4px}
+.help-sec h4{font-size:15px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.help-sec>p{font-size:13.5px;color:var(--ink-2);line-height:1.55;margin-bottom:6px}
+.help-list{list-style:none;margin:4px 0 6px}
+.help-list li{position:relative;padding:3px 0 3px 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.help-list li::before{content:"·";position:absolute;left:2px;color:var(--ink-faint);font-weight:700}
+.help-tip{font-size:13px;color:var(--ink-muted);background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:9px 12px;line-height:1.55}
 .seg{display:inline-flex;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:3px;margin-bottom:var(--sp-md);gap:2px}
 .seg button{background:transparent;border:none;color:var(--ink-muted);font-family:var(--font);font-size:14px;font-weight:500;padding:7px 16px;border-radius:var(--r-sm);cursor:pointer}
 .seg button.on{background:var(--primary);color:#fff}

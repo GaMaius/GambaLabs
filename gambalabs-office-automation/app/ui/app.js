@@ -121,6 +121,16 @@ function applySpecVisibility() {
 }
 function toggleSpec() { SPEC_ON = !SPEC_ON; localStorage.setItem("specMode", SPEC_ON ? "1" : "0"); applySpecVisibility(); }
 applySpecVisibility();
+
+/* ── 사용 가이드(온보딩) ── */
+function openHelp() { $("helpModal").classList.remove("hidden"); }
+function closeHelp() { $("helpModal").classList.add("hidden"); }
+function helpDontShow() { localStorage.setItem("helpHide", $("helpDontShow").checked ? "1" : "0"); }
+(function () {
+  const hide = localStorage.getItem("helpHide") === "1";
+  const cb = $("helpDontShow"); if (cb) cb.checked = hide;
+  if (!hide) openHelp();   // 처음 쓰는 사람에게 자동 노출(체크 시 중단)
+})();
 window.addEventListener("pywebviewready", initStatus);
 
 /* ── PPT 풀 자동 ── */

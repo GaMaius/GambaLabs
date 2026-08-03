@@ -20,6 +20,7 @@
         <button data-tab="vector"><span class="dot" style="background:var(--orange)"></span> 벡터 변환</button>
       </nav>
       <div class="spacer"></div>
+      <button class="btn btn-util" style="margin-bottom:10px;width:100%" onclick="openHelp()">❓ 사용 가이드</button>
       <button id="themeBtn" class="btn btn-util" style="margin-bottom:10px;width:100%">☀️ 라이트로</button>
       <label style="font-size:11px;color:var(--ink-faint);display:block;margin-bottom:3px">AI 모델</label>
       <select id="modelSel" class="modelsel" onchange="onModelChange()"></select>
@@ -304,6 +305,53 @@
         <button class="btn btn-primary" style="width:100%" onclick="themeUpload()">테마 파일 선택 후 추가</button>
         <div id="tmUpResult" class="result hidden"></div>
       </div>
+    </div>
+  </div>
+  <!-- 사용 가이드(온보딩) -->
+  <div id="helpModal" class="modal hidden" onclick="if(event.target===this)closeHelp()">
+    <div class="modal-card" style="width:600px;max-width:94vw">
+      <div class="modal-head">
+        <h3>👋 감바랩스 오피스 AI — 사용 가이드</h3><button class="modal-x" onclick="closeHelp()">✕</button>
+      </div>
+      <div class="help-body">
+        <p class="help-lead">3개 탭으로 <b>발표자료 · 데이터/차트 · 벡터 변환</b>을 자동화해요. 처음이라면 아래 순서로 시작해보세요.</p>
+
+        <div class="help-sec">
+          <h4><span class="dot" style="background:var(--purple)"></span> 발표자료 만들기</h4>
+          <p>① 위 4가지 방식 중 하나를 고르고 → ② <b>🎨 디자인 테마</b>를 정하면(비율·컬러·배경·폰트가 여기서 결정) → ③ 생성.</p>
+          <ul class="help-list">
+            <li><b>풀 자동 생성</b> — 내용이 담긴 문서(md·txt)를 넣으면 알아서 덱으로. 가장 간편.</li>
+            <li><b>PPT 입력</b> — 파워포인트에 <b>내용 + 설명</b>(“여기 원형차트”, “배경에 음성인식 이미지”)을 적어 주면 해석해 디자인.</li>
+            <li><b>AI 대화형</b> — 챗봇이 <b>질문하며</b> 함께 제작(참고자료·강조점 등). 샘플 확인 후 전체 생성.</li>
+            <li><b>디자인 보조(스펙)</b> — 문법으로 세밀 제어(고급). 상단 토글로 표시.</li>
+          </ul>
+          <p class="help-tip">💡 <b>디자인(비율·컬러·배경·폰트)</b>은 테마로 정해요. 우리 팀 색으로 만들려면 <b>🎨 옆 ＋ 버튼</b> → 색 3개로 커스텀 테마 제작, 또는 테마 파일 업로드.</p>
+        </div>
+
+        <div class="help-sec">
+          <h4><span class="dot" style="background:var(--teal)"></span> 데이터 &amp; 차트</h4>
+          <ul class="help-list">
+            <li><b>실험/재무 기록</b> — 결과를 한 줄로 적으면 트래커에 누적 + 추이 차트 자동. (실험 스크립트엔 <span class="mono">log_result()</span> 한 줄로 자동 기록)</li>
+            <li><b>대시보드 수정</b> — “종료일 8/25로, 상태 지연” 같이 말하면 셀만 수정(수식·차트 보존). 미리보기 후 적용.</li>
+            <li><b>분석/요약</b> — 엑셀을 읽어 요약·추세·이상치.</li>
+          </ul>
+        </div>
+
+        <div class="help-sec">
+          <h4><span class="dot" style="background:var(--orange)"></span> 벡터 변환</h4>
+          <p>로고·아이콘·이미지를 확대해도 안 깨지는 <b>SVG</b>로. 사진은 <b>색 단순화</b>·<b>해상도</b>를 올릴수록 원본에 가깝지만 용량↑. 오래 걸리면 <b>■ 중지</b>.</p>
+        </div>
+
+        <div class="help-sec">
+          <h4>⚙️ 알아두면 좋은 것</h4>
+          <ul class="help-list">
+            <li>왼쪽 아래 <b>AI 모델</b>: 로컬(무료·느림) 7B/3B 중 선택. 회사 GPT 연결 시 훨씬 빠르고 정확.</li>
+            <li>결과 파일은 <b>output 폴더</b>에 저장 — 각 결과의 <b>폴더 열기</b>로 확인.</li>
+            <li>로컬 모델은 수십 초~수 분 걸릴 수 있어요(정상).</li>
+          </ul>
+        </div>
+      </div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" id="helpDontShow" onchange="helpDontShow()"> 다음부터 자동으로 열지 않기</label>
     </div>
   </div>
   <script src="app.js"></script>
