@@ -317,7 +317,7 @@ class Api:
         return remove(im, session=self._rembg_session).convert("RGBA")
 
     # ── 벡터 변환: 비트맵 → SVG (visioncortex/vtracer) ──
-    def vectorize(self, image_path, colormode="color", mode="spline", filter_speckle=4, remove_bg=False):
+    def vectorize(self, image_path, colormode="color", mode="spline", filter_speckle=4, remove_bg=False, quantize=0):
         import subprocess
         if not image_path or not os.path.exists(image_path):
             return {"error": "이미지를 선택하세요."}
@@ -360,6 +360,23 @@ class Api:
                     removed = True
                 except Exception as e:
                     return {"error": f"배경 제거 실패({type(e).__name__}: {e}). 'pip install rembg[cpu]' 확인."}
+            # 색 단순화(포스터화): 복잡한 사진·그림을 N색으로 줄여 깔끔한 벡터로 (알파 보존)
+            try:
+                n = int(quantize)
+            except Exception:
+                n = 0
+            if n >= 2:
+                try:
+                    from PIL import Image as _Img
+                    if im.mode == "RGBA":
+                        alpha = im.getchannel("A")
+                        rgb = im.convert("RGB").quantize(colors=n, method=_Img.MEDIANCUT).convert("RGB")
+                        im = rgb.convert("RGBA")
+                        im.putalpha(alpha)
+                    else:
+                        im = im.convert("RGB").quantize(colors=n, method=_Img.MEDIANCUT).convert("RGB")
+                except Exception:
+                    pass
             try:  # 색이 매우 많으면(사진) 속도·용량 위해 잡티 제거 강화
                 if colormode == "color" and len(im.getcolors(maxcolors=20000) or [1] * 20001) > 6000:
                     noisy = True
