@@ -403,9 +403,9 @@ class Api:
                 r = subprocess.run(
                     [sys.executable, runner, src, out,
                      str(colormode), str(mode), str(fs), str(cprec)],
-                    capture_output=True, text=True, timeout=150)
+                    capture_output=True, text=True, timeout=200)
             except subprocess.TimeoutExpired:
-                return {"error": "변환이 150초를 넘겨 중단했습니다. 이미지가 너무 복잡하거나 해상도가 높아요 — "
+                return {"error": "변환이 200초를 넘겨 중단했습니다. 이미지가 너무 복잡하거나 해상도가 높아요 — "
                                  "해상도를 낮추거나, 잡티 제거를 강하게, 색 단순화를 켜서 다시 시도하세요."}
             if r.returncode != 0 or not os.path.exists(out):
                 return {"error": f"변환 실패: {(r.stderr or '')[-300:]}"}
