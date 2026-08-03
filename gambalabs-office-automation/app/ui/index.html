@@ -245,15 +245,17 @@
               </select></label>
             <label>색 단순화<select id="vecQuant" class="modelsel">
                 <option value="0">끔 (원본색)</option>
-                <option value="8">강하게 (8색)</option>
-                <option value="16">보통 (16색)</option>
-                <option value="24" selected>부드럽게 (24색)</option>
+                <option value="8">8색</option>
+                <option value="16">16색</option>
+                <option value="24" selected>24색</option>
                 <option value="32">32색</option>
-                <option value="48">48색 (색 보존↑)</option>
-                <option value="64">64색 (최대·용량↑)</option>
+                <option value="48">48색</option>
+                <option value="64">64색</option>
+                <option value="128">128색</option>
+                <option value="256">256색</option>
               </select></label>
           </div>
-          <div class="hint" style="margin-top:8px">복잡한 사진·그림이 지저분하면 <b>색 단순화</b>를 켜세요. <b>색이 뭉개지면 색 수를 늘리세요</b>(24→48→64, 색 보존↑·용량↑). 사진엔 곡선 방식 <b>spline</b> 권장.</div>
+          <div class="hint" style="margin-top:8px">복잡한 사진·그림이 지저분하면 <b>색 단순화</b>를 켜세요. <b>색이 뭉개지면 색 수를 늘리세요</b>(24→48→64→256, 색 보존↑·용량↑). 사진엔 곡선 방식 <b>spline</b> 권장.</div>
           <label class="chk" style="margin-top:14px"><input type="checkbox" id="vecRmBg"> <span><b>배경 제거</b> — 인물·사물만
               추출해 투명 배경으로 (로컬 AI, 원할 때만) <span class="warn">첫 사용 시 모델 준비로 잠깐</span></span></label>
         </div>
