@@ -317,7 +317,7 @@ class Api:
         return remove(im, session=self._rembg_session).convert("RGBA")
 
     # ── 벡터 변환: 비트맵 → SVG (visioncortex/vtracer) ──
-    def vectorize(self, image_path, colormode="color", mode="spline", filter_speckle=4, remove_bg=False, quantize=0):
+    def vectorize(self, image_path, colormode="color", mode="spline", filter_speckle=4, remove_bg=False, quantize=0, max_dim=800):
         import subprocess
         if not image_path or not os.path.exists(image_path):
             return {"error": "이미지를 선택하세요."}
@@ -349,7 +349,11 @@ class Api:
                 return {"error": f"이미지를 읽을 수 없습니다({type(e).__name__}). PNG·JPG로 저장한 파일로 다시 시도하세요."}
 
             w, h = im.size
-            MAX = 800
+            try:
+                MAX = int(max_dim)
+            except Exception:
+                MAX = 800
+            MAX = min(max(MAX, 200), 4000)   # 200~4000px 사이로 제한(과도한 지연 방지)
             if max(w, h) > MAX:
                 sc = MAX / max(w, h)
                 im = im.resize((max(1, int(w * sc)), max(1, int(h * sc))))
@@ -399,10 +403,10 @@ class Api:
                 r = subprocess.run(
                     [sys.executable, runner, src, out,
                      str(colormode), str(mode), str(fs), str(cprec)],
-                    capture_output=True, text=True, timeout=60)
+                    capture_output=True, text=True, timeout=150)
             except subprocess.TimeoutExpired:
-                return {"error": "변환이 60초를 넘겨 중단했습니다. 이미지가 너무 복잡해요 — "
-                                 "로고·아이콘 같은 단순한 이미지를 쓰거나, '흑백(2색)' 모드 / '잡티 제거: 강'으로 다시 시도하세요."}
+                return {"error": "변환이 150초를 넘겨 중단했습니다. 이미지가 너무 복잡하거나 해상도가 높아요 — "
+                                 "해상도를 낮추거나, 잡티 제거를 강하게, 색 단순화를 켜서 다시 시도하세요."}
             if r.returncode != 0 or not os.path.exists(out):
                 return {"error": f"변환 실패: {(r.stderr or '')[-300:]}"}
 

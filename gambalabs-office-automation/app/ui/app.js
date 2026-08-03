@@ -275,7 +275,7 @@ async function vectorize() {
   const box = $("vecResult"); spin(box, rmbg ? "배경 제거 후 벡터 변환 중… (첫 사용은 모델 준비로 잠깐)" : "벡터 변환 중… (사진·큰 이미지는 다소 걸릴 수 있어요)"); show(box); $("vecBtn").disabled = true;
   $("vecPreview").classList.add("hidden");
   try {
-    const r = await api().vectorize(VEC, $("vecColor").value, $("vecMode").value, $("vecSpeckle").value, rmbg, $("vecQuant").value);
+    const r = await api().vectorize(VEC, $("vecColor").value, $("vecMode").value, $("vecSpeckle").value, rmbg, $("vecQuant").value, $("vecRes").value);
     if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); }
     else {
       const kb = (n) => (n / 1024).toFixed(0) + "KB";
