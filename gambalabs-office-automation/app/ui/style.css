@@ -140,6 +140,45 @@ table.chg td .to{color:var(--green);font-weight:600}
 .help-list li{position:relative;padding:3px 0 3px 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5}
 .help-list li::before{content:"·";position:absolute;left:2px;color:var(--ink-faint);font-weight:700}
 .help-tip{font-size:13px;color:var(--ink-muted);background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:9px 12px;line-height:1.55}
+/* 온보딩 튜토리얼(시각형) */
+.help-cards{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.hcard{flex:1;min-width:150px;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:11px 12px}
+.hcard-ico{width:34px;height:34px;flex:0 0 34px;border-radius:var(--r-md);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px}
+.hcard-t{display:flex;flex-direction:column;line-height:1.35}
+.hcard-t b{font-size:14px;color:var(--ink)}
+.hcard-t span{font-size:11.5px;color:var(--ink-muted)}
+.help-flow{background:var(--canvas-soft);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:14px}
+.hflow-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px}
+.hstep{display:flex;gap:12px;padding:8px 0;align-items:flex-start}
+.hstep+.hstep{border-top:1px solid var(--hairline)}
+.hstep-n{width:24px;height:24px;flex:0 0 24px;border-radius:var(--r-full);background:var(--primary);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.hstep>div{font-size:13.5px;color:var(--ink-2)}
+.hstep b{color:var(--ink)}
+.hstep-sub{font-size:12.5px;color:var(--ink-muted);margin-top:4px;line-height:1.5}
+.htags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.htags span{font-size:11.5px;background:var(--surface);border:1px solid var(--hairline-strong);border-radius:var(--r-full);padding:3px 9px;color:var(--ink-2)}
+.help-mini{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--ink-muted);line-height:1.5}
+.help-mini b{color:var(--ink-2)}
+/* skill 기반 디자인 설정 폼 */
+.qform{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:var(--sp-md);margin-bottom:var(--sp-md)}
+.qform-head{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.qform-head span{font-weight:400;font-size:12.5px;color:var(--ink-muted)}
+.qitem{border-top:1px solid var(--hairline)}
+.qitem summary{list-style:none;cursor:pointer;padding:10px 4px;font-size:13.5px;font-weight:600;color:var(--ink-2);display:flex;align-items:center;gap:8px}
+.qitem summary::-webkit-details-marker{display:none}
+.qitem summary::after{content:"▸";margin-left:auto;color:var(--ink-faint);font-size:12px}
+.qitem[open] summary::after{content:"▾"}
+.qitem summary:hover{color:var(--ink)}
+.qbody{padding:2px 4px 12px}
+.qbody textarea{min-height:70px;margin-top:0}
+.qchips{display:flex;flex-wrap:wrap;gap:6px}
+.qchip{background:var(--canvas);border:1px solid var(--hairline);color:var(--ink-2);font-family:var(--font);font-size:13px;padding:6px 12px;border-radius:var(--r-full);cursor:pointer}
+.qchip:hover{border-color:var(--hairline-strong);color:var(--ink)}
+.qchip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.qrow{display:flex;align-items:center;gap:12px;margin-bottom:8px;font-size:13px;color:var(--ink-2)}
+.qrow>span{width:56px;flex:0 0 56px;color:var(--ink-muted);font-weight:600}
+.qrow input[type=color]{width:52px;height:30px;border:1px solid var(--hairline);border-radius:var(--r-sm);background:var(--canvas);cursor:pointer;padding:2px}
+.qnote{font-size:11.5px;color:var(--ink-faint);margin-top:6px}
 .seg{display:inline-flex;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:3px;margin-bottom:var(--sp-md);gap:2px}
 .seg button{background:transparent;border:none;color:var(--ink-muted);font-family:var(--font);font-size:14px;font-weight:500;padding:7px 16px;border-radius:var(--r-sm);cursor:pointer}
 .seg button.on{background:var(--primary);color:#fff}

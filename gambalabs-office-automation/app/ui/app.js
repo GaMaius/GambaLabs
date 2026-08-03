@@ -33,7 +33,8 @@ document.querySelectorAll(".nav button").forEach((b) => {
 /* 모드 토글 */
 function pptMode(m) {
   document.querySelectorAll('#tab-ppt .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
-  ["auto", "spec", "chat", "import"].forEach((k) => $("ppt-" + k).classList.toggle("hidden", k !== m));
+  ["theme", "import", "auto", "float"].forEach((k) => $("ppt-" + k).classList.toggle("hidden", k !== m));
+  $("designForm").classList.toggle("hidden", m === "float");  // 디자인 설정: 플로팅 편집기 제외 노출
 }
 function dataMode(m) {
   document.querySelectorAll('#tab-data .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
@@ -112,15 +113,51 @@ async function deleteCurrentTheme() {
   refreshThemes({ options: r.options, current: r.current });
 }
 
-/* ── 디자인 보조(스펙) 모드 숨김 토글 ── */
-let SPEC_ON = localStorage.getItem("specMode") === "1";
-function applySpecVisibility() {
-  $("segSpec").style.display = SPEC_ON ? "" : "none";
-  $("specToggle").textContent = SPEC_ON ? "－ 디자인 보조(스펙) 모드 숨기기" : "＋ 디자인 보조(스펙) 모드 표시";
-  if (!SPEC_ON && $("segSpec").classList.contains("on")) pptMode("auto");
+/* ── skill 기반 디자인 설정 폼 ── */
+let REF = "";
+function qPick(group, btn) {
+  const box = $(group);
+  box.querySelectorAll(".qchip").forEach((c) => c.classList.remove("on"));
+  btn.classList.add("on");
+  box.dataset.val = btn.dataset.v;
 }
-function toggleSpec() { SPEC_ON = !SPEC_ON; localStorage.setItem("specMode", SPEC_ON ? "1" : "0"); applySpecVisibility(); }
-applySpecVisibility();
+async function pickRef() { const p = await api().pick_file("doc"); if (p) { REF = p; setPath("refPath", p); } }
+function readDesignForm() {
+  const bgTone = $("qBgTone").dataset.val;
+  const bg = bgTone === "dark" ? "141a2b" : "f6f8fc";   // 배경 톤 → 배경색
+  const font = $("qFont").dataset.val === "__custom" ? ($("qFontCustom").value.trim() || "맑은 고딕") : $("qFont").dataset.val;
+  return {
+    purpose: $("qPurpose").value.trim(),
+    ratio: $("qRatio").dataset.val,
+    bg, accent: $("qAccent").value.replace("#", ""), ink: $("qInk").value.replace("#", ""),
+    band_fill: $("qBg").dataset.val === "solid", gradient: $("qBg").dataset.val === "gradient",
+    font, ref: REF || "",
+  };
+}
+async function applyFormTheme() {
+  const f = readDesignForm();
+  try { await api().set_form_theme(f.bg, f.accent, f.ink, f.band_fill, f.font); } catch (e) {}
+  return f;
+}
+async function makeThemeFromForm() {
+  const name = $("themeName").value.trim(); if (!name) return alert("테마 이름을 입력하세요.");
+  const f = readDesignForm(); const box = $("themeMakeResult"); spin(box, "테마 생성 중…"); show(box);
+  try {
+    const r = await api().add_theme_build(name, f.bg, f.accent, f.ink, f.band_fill, f.font);
+    if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
+    refreshThemes({ options: r.options, current: r.current });
+    show(box, `<span class="ok">✅ '${esc(r.added.label)}' 테마 생성·적용됨</span> — 🎨 목록에서 선택되고, PPT 디자인/자동 생성에도 쓰입니다.`);
+  } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
+}
+
+/* ── 플로팅 편집기 ── */
+async function openFloat() {
+  const box = $("floatResult"); show(box, `<span class="spin"></span>여는 중…`);
+  try {
+    const r = await api().open_float();
+    show(box, r && r.error ? `<span class="err">${esc(r.error)}</span>` : `<span class="ok">✅ 플로팅 창을 열었어요.</span> 화면 위에 항상 떠 있어요(닫기 전까지).`);
+  } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
+}
 
 /* ── 사용 가이드(온보딩) ── */
 function openHelp() { $("helpModal").classList.remove("hidden"); }
@@ -148,6 +185,7 @@ async function makePpt() {
   if (!PPT) return alert("문서를 선택하세요.");
   const llm = $("autoLLM").checked;
   spin($("pptResult"), llm ? "AI 구조화 후 생성 중…" : "생성 중…"); show($("pptResult")); $("pptGoBtn").disabled = true;
+  await applyFormTheme();   // 디자인 설정을 테마로 적용
   const r = await api().ppt_make_full(PPT, llm); $("pptGoBtn").disabled = false;
   if (r.error) return show($("pptResult"), `<span class="err">${esc(r.error)}</span>`);
   show($("pptResult"), `<span class="ok">✅ 생성 완료</span> <span class="t">${esc(r.engine || "")}</span> <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
@@ -248,6 +286,7 @@ async function makeImport() {
   if (!IMPORT) return alert("PPTX를 선택하세요.");
   const llm = $("importLLM").checked;
   spin($("importResult"), llm ? "AI 해석 후 생성 중…" : "생성 중…"); show($("importResult")); $("importGoBtn").disabled = true;
+  await applyFormTheme();   // 디자인 설정을 테마로 적용
   const r = await api().ppt_import_make(IMPORT, llm); $("importGoBtn").disabled = false;
   if (r.error) return show($("importResult"), `<span class="err">${esc(r.error)}</span>`);
   show($("importResult"), `<span class="ok">✅ ${r.count}장 생성</span> <span class="t">${esc(r.engine || "")}</span> <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);

@@ -35,21 +35,67 @@
           <p>제작자가 내용·구성을 정하면, 툴이 브랜드 디자인을 입힙니다.</p>
         </div>
         <div class="toolbar">
-          <div class="seg"><button class="on" data-m="auto" onclick="pptMode('auto')">풀 자동 생성</button><button
-              id="segSpec" data-m="spec" onclick="pptMode('spec')">디자인 보조 (스펙)</button><button data-m="chat"
-              onclick="pptMode('chat')">AI 대화형</button><button data-m="import" onclick="pptMode('import')">PPT
-              입력</button></div>
+          <div class="seg"><button class="on" data-m="theme" onclick="pptMode('theme')">테마 개발</button><button
+              data-m="import" onclick="pptMode('import')">PPT 디자인</button><button data-m="auto"
+              onclick="pptMode('auto')">자동 생성 PPT</button><button data-m="float"
+              onclick="pptMode('float')">플로팅 편집기</button></div>
           <div class="themepick"><span class="themepick-label">🎨 디자인 테마</span><select id="themeSel" class="modelsel"
               onchange="onThemeChange()"></select><button class="iconbtn" onclick="openThemeModal()"
               title="테마 추가·제작">＋</button><button class="iconbtn danger hidden" id="themeDelBtn"
               onclick="deleteCurrentTheme()" title="현재 커스텀 테마 삭제">🗑</button></div>
         </div>
-        <div class="advbar"><button id="specToggle" class="linkbtn" onclick="toggleSpec()"></button></div>
 
-        <div id="ppt-auto">
+        <!-- skill 기반 디자인 질문 입력 폼 (테마개발·PPT디자인·자동생성 공용) -->
+        <div id="designForm" class="qform">
+          <div class="qform-head">🎨 디자인 설정 <span>— pptx-making-guide 질문에 답하면 테마가 만들어집니다. 항목을 눌러 펼치세요.</span></div>
+          <details class="qitem" open>
+            <summary>🎯 목적 · 스타일</summary>
+            <div class="qbody"><textarea id="qPurpose" placeholder="예) 투자사 대상 WordSense 기술 소개. 신뢰감 있고 깔끔하게, 성능 강조"></textarea></div>
+          </details>
+          <details class="qitem">
+            <summary>📐 비율</summary>
+            <div class="qbody"><div class="qchips" id="qRatio" data-val="16:9">
+              <button class="qchip on" data-v="16:9" onclick="qPick('qRatio',this)">16:9 (기본)</button>
+              <button class="qchip" data-v="4:3" onclick="qPick('qRatio',this)">4:3</button>
+              <button class="qchip" data-v="A4" onclick="qPick('qRatio',this)">A4 세로</button>
+            </div><div class="qnote">현재 16:9 최적. 4:3·A4는 실험적.</div></div>
+          </details>
+          <details class="qitem">
+            <summary>🎨 컬러</summary>
+            <div class="qbody">
+              <div class="qrow"><span>배경 톤</span><div class="qchips" id="qBgTone" data-val="light">
+                <button class="qchip on" data-v="light" onclick="qPick('qBgTone',this)">밝게</button>
+                <button class="qchip" data-v="dark" onclick="qPick('qBgTone',this)">어둡게</button></div></div>
+              <div class="qrow"><span>강조색</span><input type="color" id="qAccent" value="#0038a3"></div>
+              <div class="qrow"><span>글자색</span><input type="color" id="qInk" value="#1a1a1a"></div>
+            </div>
+          </details>
+          <details class="qitem">
+            <summary>🖼 배경</summary>
+            <div class="qbody"><div class="qchips" id="qBg" data-val="solid">
+              <button class="qchip on" data-v="solid" onclick="qPick('qBg',this)">단색</button>
+              <button class="qchip" data-v="gradient" onclick="qPick('qBg',this)">그라데이션</button>
+            </div></div>
+          </details>
+          <details class="qitem">
+            <summary>🔤 폰트</summary>
+            <div class="qbody"><div class="qchips" id="qFont" data-val="맑은 고딕">
+              <button class="qchip on" data-v="맑은 고딕" onclick="qPick('qFont',this)">기본 (맑은 고딕)</button>
+              <button class="qchip" data-v="__custom" onclick="qPick('qFont',this);document.getElementById('qFontCustom').classList.toggle('hidden',this.dataset.v!=='__custom')">기타</button>
+            </div><input id="qFontCustom" class="hidden" placeholder="폰트 이름 (예: Pretendard)" style="margin-top:8px;width:100%"></div>
+          </details>
+          <details class="qitem">
+            <summary>📎 참고자료 (선택)</summary>
+            <div class="qbody"><div class="row"><button class="btn btn-util" onclick="pickRef()">파일 선택</button>
+              <div class="pathbox empty" id="refPath">선택된 참고자료 없음</div></div>
+              <div class="qnote">디자인·내용 참고용. (md·txt·docx·pdf·이미지)</div></div>
+          </details>
+        </div>
+
+        <div id="ppt-auto" class="hidden">
           <div class="card">
             <h3><span class="step-no">1</span> 문서 선택</h3>
-            <div class="hint">문서 전체를 브랜드 덱으로 자동 구성 (md·txt).</div>
+            <div class="hint">문서 전체를 브랜드 덱으로 자동 구성 (md·txt). 디자인은 위 <b>디자인 설정</b>을 따릅니다.</div>
             <div class="row"><button class="btn btn-util" onclick="pickPpt()">문서 선택</button>
               <div class="pathbox empty" id="pptPath">선택된 문서 없음</div>
             </div>
@@ -68,46 +114,22 @@
           </div>
         </div>
 
-        <div id="ppt-spec" class="hidden">
+        <div id="ppt-theme">
           <div class="card">
-            <h3><span class="step-no">1</span> 슬라이드 스펙</h3>
-            <div class="hint">내용·구성·강조는 당신이. 디자인·차트·이미지는 툴이. <span class="mono">[차트: 막대, 데이터=..]</span> <span
-                class="mono">[이미지: 설명, 배경]</span> <span class="mono">[강조]</span></div>
-            <textarea id="specText" style="min-height:220px"></textarea>
-            <div class="row" style="margin-top:8px"><button class="btn btn-ghost" onclick="fillSpecSample()">예시
-                채우기</button></div>
-          </div>
-          <div class="card">
-            <h3><span class="step-no">2</span> 구성 미리보기 <span style="flex:1"></span><button class="btn btn-ghost"
-                onclick="previewSpec()">미리보기</button></h3>
-            <div id="specOutline" class="result hidden"></div>
-          </div>
-          <div class="card">
-            <h3><span class="step-no">3</span> 생성</h3>
-            <div class="row"><button class="btn btn-primary" id="specGoBtn" onclick="makeSpec()">디자인 생성</button></div>
-            <div id="specResult" class="result hidden"></div>
+            <h3><span class="step-no">＊</span> 테마 만들기</h3>
+            <div class="hint">위 <b>디자인 설정</b>으로 재사용 가능한 브랜드 테마를 만들어 저장합니다. 만든 테마는 오른쪽 위 🎨 목록에서 선택하거나 다른 발표에도 씁니다.</div>
+            <div class="row" style="margin-top:6px"><input id="themeName" placeholder="테마 이름 (예: 우리팀 블루)"
+                style="flex:1;min-width:200px"><button class="btn btn-primary" onclick="makeThemeFromForm()">이 설정으로 테마 만들기</button>
+            </div>
+            <div id="themeMakeResult" class="result hidden"></div>
           </div>
         </div>
-        <div id="ppt-chat" class="hidden">
-          <div class="chatthread">
-            <div id="chatLog" class="chatlog">
-              <div id="chatEmpty" class="chatempty">
-                <div class="chatempty-ico">◆</div>
-                <h2>무엇을 만들까요?</h2>
-                <p>주제·자료를 적어 보내면, 에이전트가 필요한 걸 <b>질문하며</b> 함께 만들어요. 샘플 확인 후 전체 생성.</p>
-                <div class="chips">
-                  <button class="chip" onclick="chatFill('WordSense 기술 소개 발표자료. 투자사 대상, 성능·상용화 강조')">WordSense 투자사
-                    소개</button>
-                  <button class="chip" onclick="chatFill('온디바이스 vs 클라우드 KWS 비교 발표자료')">온디바이스 vs 클라우드</button>
-                  <button class="chip" onclick="chatFill('실험 결과 리포트 발표자료. 정확도 추이 차트 포함')">실험 결과 리포트</button>
-                </div>
-              </div>
-            </div>
-            <div class="composer">
-              <textarea id="chatInput" rows="1" placeholder="메시지를 입력하세요…  (Enter 전송, Shift+Enter 줄바꿈)"
-                onkeydown="chatKey(event)" oninput="autoGrow(this)"></textarea>
-              <button class="sendbtn" onclick="chatSend()" title="보내기">↑</button>
-            </div>
+        <div id="ppt-float" class="hidden">
+          <div class="card">
+            <h3>🪟 플로팅 편집기</h3>
+            <div class="hint">화면 위에 <b>항상 떠 있는 작은 창</b>을 엽니다. 파워포인트 등 다른 앱 위에서 메모·수정 지시를 적어두고 참고할 수 있어요.</div>
+            <div class="row"><button class="btn btn-primary" onclick="openFloat()">플로팅 창 열기</button></div>
+            <div id="floatResult" class="result hidden"></div>
           </div>
         </div>
 
@@ -314,41 +336,36 @@
         <h3>👋 감바랩스 오피스 AI — 사용 가이드</h3><button class="modal-x" onclick="closeHelp()">✕</button>
       </div>
       <div class="help-body">
-        <p class="help-lead">3개 탭으로 <b>발표자료 · 데이터/차트 · 벡터 변환</b>을 자동화해요. 처음이라면 아래 순서로 시작해보세요.</p>
-
-        <div class="help-sec">
-          <h4><span class="dot" style="background:var(--purple)"></span> 발표자료 만들기</h4>
-          <p>① 위 4가지 방식 중 하나를 고르고 → ② <b>🎨 디자인 테마</b>를 정하면(비율·컬러·배경·폰트가 여기서 결정) → ③ 생성.</p>
-          <ul class="help-list">
-            <li><b>풀 자동 생성</b> — 내용이 담긴 문서(md·txt)를 넣으면 알아서 덱으로. 가장 간편.</li>
-            <li><b>PPT 입력</b> — 파워포인트에 <b>내용 + 설명</b>(“여기 원형차트”, “배경에 음성인식 이미지”)을 적어 주면 해석해 디자인.</li>
-            <li><b>AI 대화형</b> — 챗봇이 <b>질문하며</b> 함께 제작(참고자료·강조점 등). 샘플 확인 후 전체 생성.</li>
-            <li><b>디자인 보조(스펙)</b> — 문법으로 세밀 제어(고급). 상단 토글로 표시.</li>
-          </ul>
-          <p class="help-tip">💡 <b>디자인(비율·컬러·배경·폰트)</b>은 테마로 정해요. 우리 팀 색으로 만들려면 <b>🎨 옆 ＋ 버튼</b> → 색 3개로 커스텀 테마 제작, 또는 테마 파일 업로드.</p>
+        <p class="help-lead">세 가지를 자동화해요. 아래 카드에서 시작하세요.</p>
+        <div class="help-cards">
+          <div class="hcard"><div class="hcard-ico" style="background:var(--purple)">◈</div>
+            <div class="hcard-t"><b>발표자료</b><span>테마 · PPT 디자인 · 자동 생성</span></div></div>
+          <div class="hcard"><div class="hcard-ico" style="background:var(--teal)">▤</div>
+            <div class="hcard-t"><b>데이터 &amp; 차트</b><span>기록 · 수정 · 분석</span></div></div>
+          <div class="hcard"><div class="hcard-ico" style="background:var(--orange)">❖</div>
+            <div class="hcard-t"><b>벡터 변환</b><span>이미지 → SVG</span></div></div>
         </div>
 
-        <div class="help-sec">
-          <h4><span class="dot" style="background:var(--teal)"></span> 데이터 &amp; 차트</h4>
-          <ul class="help-list">
-            <li><b>실험/재무 기록</b> — 결과를 한 줄로 적으면 트래커에 누적 + 추이 차트 자동. (실험 스크립트엔 <span class="mono">log_result()</span> 한 줄로 자동 기록)</li>
-            <li><b>대시보드 수정</b> — “종료일 8/25로, 상태 지연” 같이 말하면 셀만 수정(수식·차트 보존). 미리보기 후 적용.</li>
-            <li><b>분석/요약</b> — 엑셀을 읽어 요약·추세·이상치.</li>
-          </ul>
+        <div class="help-flow">
+          <div class="hflow-title">📊 발표자료 만들기 — 3단계</div>
+          <div class="hstep"><span class="hstep-n">1</span>
+            <div><b>방식 고르기</b>
+              <div class="htags"><span>테마 개발</span><span>PPT 디자인</span><span>자동 생성 PPT</span><span>플로팅 편집기</span></div>
+              <div class="hstep-sub">PPT 디자인 = 러프 PPT에 내용·설명 적어 주기 · 자동 생성 = 문서만 넣기</div>
+            </div>
+          </div>
+          <div class="hstep"><span class="hstep-n">2</span>
+            <div><b>디자인 설정</b><div class="hstep-sub">목적·비율·컬러·배경·폰트 항목을 눌러 입력 → 답하면 <b>테마가 만들어져요</b></div></div>
+          </div>
+          <div class="hstep"><span class="hstep-n">3</span>
+            <div><b>생성</b><div class="hstep-sub">문서·PPT를 넣고 생성 → <b>폴더 열기</b>로 결과 확인</div></div>
+          </div>
         </div>
 
-        <div class="help-sec">
-          <h4><span class="dot" style="background:var(--orange)"></span> 벡터 변환</h4>
-          <p>로고·아이콘·이미지를 확대해도 안 깨지는 <b>SVG</b>로. 사진은 <b>색 단순화</b>·<b>해상도</b>를 올릴수록 원본에 가깝지만 용량↑. 오래 걸리면 <b>■ 중지</b>.</p>
-        </div>
-
-        <div class="help-sec">
-          <h4>⚙️ 알아두면 좋은 것</h4>
-          <ul class="help-list">
-            <li>왼쪽 아래 <b>AI 모델</b>: 로컬(무료·느림) 7B/3B 중 선택. 회사 GPT 연결 시 훨씬 빠르고 정확.</li>
-            <li>결과 파일은 <b>output 폴더</b>에 저장 — 각 결과의 <b>폴더 열기</b>로 확인.</li>
-            <li>로컬 모델은 수십 초~수 분 걸릴 수 있어요(정상).</li>
-          </ul>
+        <div class="help-mini">
+          <div>⚙️ <b>AI 모델</b>(좌하단) — 로컬 무료(느림) ↔ 회사 GPT(빠름·정확)</div>
+          <div>💾 결과는 <b>output 폴더</b>에 저장 · 로컬 모델은 수십 초~수 분(정상)</div>
+          <div>❖ 벡터 변환 — 로고·아이콘은 완벽, 사진은 <b>색 단순화·해상도</b>↑로 근사(용량↑)</div>
         </div>
       </div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" id="helpDontShow" onchange="helpDontShow()"> 다음부터 자동으로 열지 않기</label>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>메모</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'맑은 고딕','Malgun Gothic',system-ui,sans-serif;background:#201f1d;color:#f4f2ef;display:flex;flex-direction:column}
+  .bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#262523;border-bottom:1px solid #38352f;font-size:12px;color:#93908a}
+  .bar b{color:#f4f2ef;font-size:12.5px}
+  .bar .sp{flex:1}
+  .bar button{background:#2d2b28;color:#cfccc6;border:1px solid #454139;border-radius:6px;font-size:11px;padding:3px 8px;cursor:pointer}
+  .bar button:hover{background:#35322e;color:#fff}
+  textarea{flex:1;width:100%;background:#191817;color:#f4f2ef;border:none;outline:none;resize:none;
+    font-family:'맑은 고딕',sans-serif;font-size:14px;line-height:1.6;padding:12px}
+  .foot{padding:6px 10px;font-size:11px;color:#6b675f;background:#262523;border-top:1px solid #38352f;display:flex;align-items:center;gap:8px}
+  .dot{width:7px;height:7px;border-radius:50%;background:#3ecf5a}
+</style>
+</head>
+<body>
+  <div class="bar"><b>📝 메모</b><span class="sp"></span>
+    <button onclick="clearNote()">지우기</button>
+    <button onclick="copyNote()">복사</button>
+  </div>
+  <textarea id="note" placeholder="파워포인트 등 다른 앱 위에 항상 떠 있어요. 수정할 점·아이디어를 여기 적어두고 참고하세요. (자동 저장)"></textarea>
+  <div class="foot"><span class="dot"></span><span id="stat">자동 저장됨</span></div>
+<script>
+  const t = document.getElementById("note");
+  t.value = localStorage.getItem("floatNote") || "";
+  let tmr;
+  t.addEventListener("input", () => {
+    localStorage.setItem("floatNote", t.value);
+    document.getElementById("stat").textContent = "저장 중…";
+    clearTimeout(tmr); tmr = setTimeout(() => document.getElementById("stat").textContent = "자동 저장됨", 400);
+  });
+  function clearNote() { if (confirm("메모를 지울까요?")) { t.value = ""; localStorage.removeItem("floatNote"); t.focus(); } }
+  function copyNote() { t.select(); document.execCommand("copy"); document.getElementById("stat").textContent = "복사됨"; }
+  t.focus();
+</script>
+</body>
+</html>

@@ -52,6 +52,8 @@ class Api:
         self._rembg_session = None   # 배경 제거 세션(최초 사용 시 로드·재사용)
         self._vec_proc = None        # 진행 중 벡터 변환 프로세스(중지용)
         self._vec_cancelled = False
+        self._form_theme = None      # 디자인 설정 폼에서 만든 임시 테마
+        self._float_window = None     # 플로팅 편집기 창
 
     # ── 파일 다이얼로그 ─────────────────────────────
     def pick_file(self, kind="doc"):
@@ -120,11 +122,43 @@ class Api:
         return {"current": self.theme}
 
     def _theme_config(self):
-        """현재 테마가 커스텀이면 전체 설정 dict, 내장이면 None."""
+        """현재 테마가 폼(__form)이면 임시 설정, 커스텀이면 전체 설정, 내장이면 None."""
+        if self.theme == "__form" and self._form_theme:
+            return self._form_theme
         try:
             return thememgr.resolve(self.theme)
         except Exception:
             return None
+
+    def set_form_theme(self, bg, accent, ink, band_fill=True, font="맑은 고딕"):
+        """디자인 설정 폼 값으로 '임시 테마'를 만들어 현재 적용(저장 안 함)."""
+        try:
+            self._form_theme = thememgr.build_config("디자인 설정", bg, accent, ink, bool(band_fill), font, font)
+            self.theme = "__form"
+            return {"ok": True}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def open_float(self):
+        """항상 위에 뜨는 작은 메모/편집 창을 연다(플로팅 편집기)."""
+        try:
+            import webview
+            if self._float_window is not None:
+                return {"ok": True, "already": True}
+            fhtml = os.path.join(HERE, "ui", "float.html")
+            win = webview.create_window("메모 · 플로팅 편집기", fhtml,
+                                        width=340, height=440, on_top=True, min_size=(240, 240))
+            self._float_window = win
+
+            def _closed():
+                self._float_window = None
+            try:
+                win.events.closed += _closed
+            except Exception:
+                pass
+            return {"ok": True}
+        except Exception as e:
+            return {"error": str(e)}
 
     def add_theme_upload(self, name):
         """테마 JSON 파일을 골라 업로드·저장."""
@@ -138,11 +172,12 @@ class Api:
         except Exception as e:
             return {"error": f"테마 파일이 올바르지 않습니다: {e}"}
 
-    def add_theme_build(self, name, bg, accent, ink, band_fill=True):
-        """제작 창에서 받은 색으로 테마 생성·저장."""
+    def add_theme_build(self, name, bg, accent, ink, band_fill=True, font="맑은 고딕"):
+        """제작 창/디자인 설정 폼에서 받은 색·폰트로 테마 생성·저장."""
         try:
-            r = thememgr.add_from_spec(name, bg, accent, ink, bool(band_fill))
+            r = thememgr.add_from_spec(name, bg, accent, ink, bool(band_fill), font, font)
             self.theme = r["id"]
+            self._form_theme = None
             return {"added": r, "options": thememgr.list_themes(), "current": self.theme}
         except Exception as e:
             return {"error": str(e)}
