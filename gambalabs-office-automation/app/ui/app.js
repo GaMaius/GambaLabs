@@ -121,6 +121,7 @@ function applySpecVisibility() {
 }
 function toggleSpec() { SPEC_ON = !SPEC_ON; localStorage.setItem("specMode", SPEC_ON ? "1" : "0"); applySpecVisibility(); }
 applySpecVisibility();
+vecModeChange();  // 벡터 옵션 초기 상태(원본 유지 기본 → 트레이스 옵션 비활성)
 window.addEventListener("pywebviewready", initStatus);
 
 /* ── PPT 풀 자동 ── */
@@ -269,6 +270,11 @@ async function analyzeExcel() {
 /* ── 벡터 변환 (비트맵 → SVG) ── */
 let VEC = "";
 async function pickVec() { const p = await api().pick_file("image"); if (p) { VEC = p; setPath("vecPath", p); } }
+function vecModeChange() {
+  // '원본 유지(embed)'는 트레이스가 아니라 원본을 그대로 감싸므로 트레이스 옵션들을 끔
+  const embed = $("vecMode").value === "embed";
+  ["vecColor", "vecSpeckle", "vecQuant"].forEach((id) => { $(id).disabled = embed; $(id).style.opacity = embed ? .45 : 1; });
+}
 async function vectorize() {
   if (!VEC) return alert("이미지를 선택하세요.");
   const rmbg = $("vecRmBg").checked;
@@ -279,7 +285,7 @@ async function vectorize() {
     if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); }
     else {
       const kb = (n) => (n / 1024).toFixed(0) + "KB";
-      const ds = (r.downscaled ? " · 축소 후 변환" : "") + (r.removed_bg ? " · 배경 제거됨" : "");
+      const ds = (r.embedded ? " · 원본 유지(형식만 SVG)" : "") + (r.downscaled ? " · 축소 후 변환" : "") + (r.removed_bg ? " · 배경 제거됨" : "");
       show(box, `<span class="ok">✅ 변환 완료</span> <span class="mono">${kb(r.in_size)} → ${kb(r.out_size)} SVG</span>${ds} <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
       if (r.preview && r.svg) {
         show($("vecPreview"), `<div class="vecprev-lbl">미리보기 (벡터)</div><div class="vecprev-box">${r.svg}</div>`);

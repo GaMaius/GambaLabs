@@ -347,6 +347,33 @@ class Api:
                 im = im.convert("RGBA")
             except Exception as e:
                 return {"error": f"이미지를 읽을 수 없습니다({type(e).__name__}). PNG·JPG로 저장한 파일로 다시 시도하세요."}
+
+            # ── 원본 임베드: 형식만 SVG (원본 픽셀 그대로, 트레이스 아님) ──
+            if mode == "embed":
+                if remove_bg:
+                    try:
+                        im = self._remove_bg(im)
+                    except Exception as e:
+                        return {"error": f"배경 제거 실패({type(e).__name__}: {e})."}
+                import base64
+                import io as _io
+                out = os.path.join(OUTPUT, _ts("vector", "svg"))
+                buf = _io.BytesIO()
+                im.save(buf, format="PNG")               # 원본 해상도·색 그대로(무손실)
+                b64 = base64.b64encode(buf.getvalue()).decode()
+                iw, ih = im.size
+                svg = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                       '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+                       f'width="{iw}" height="{ih}" viewBox="0 0 {iw} {ih}">'
+                       f'<image width="{iw}" height="{ih}" xlink:href="data:image/png;base64,{b64}"/></svg>')
+                with open(out, "w", encoding="utf-8") as f:
+                    f.write(svg)
+                out_size = os.path.getsize(out)
+                preview = out_size <= 250_000
+                return {"out": out, "svg": svg if preview else "", "preview": preview,
+                        "downscaled": False, "noisy": False, "removed_bg": remove_bg, "embedded": True,
+                        "in_size": in_size, "out_size": out_size}
+
             w, h = im.size
             MAX = 800
             if max(w, h) > MAX:
@@ -391,7 +418,7 @@ class Api:
                 return {"error": "임시 이미지 생성에 실패했습니다."}
 
             out = os.path.join(OUTPUT, _ts("vector", "svg"))  # 출력은 ASCII 고정명(경로 문제 방지)
-            cprec = 6 if colormode == "color" else 8
+            cprec = 8   # 색 정밀도 최대 — 원본에 최대한 가깝게(트레이스는 원리상 포스터화됨)
             runner = os.path.join(HERE, "ppt", "_vtrace_run.py")
             # 별도 프로세스 + 타임아웃: 어떤 이미지도 무한 대기하지 않음
             try:
