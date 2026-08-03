@@ -350,10 +350,13 @@ class Api:
 
             w, h = im.size
             try:
-                MAX = int(max_dim)
+                md = int(max_dim)
             except Exception:
-                MAX = 800
-            MAX = min(max(MAX, 200), 4000)   # 200~4000px 사이로 제한(과도한 지연 방지)
+                md = 800
+            if md <= 0:
+                MAX = min(max(w, h), 8000)    # '원본' = 파일 실제 해상도 그대로(안전상 8000 상한)
+            else:
+                MAX = min(max(md, 200), 8000)
             if max(w, h) > MAX:
                 sc = MAX / max(w, h)
                 im = im.resize((max(1, int(w * sc)), max(1, int(h * sc))))
@@ -420,6 +423,7 @@ class Api:
                 except Exception:
                     pass
             return {"out": out, "svg": svg, "preview": preview, "downscaled": downscaled,
-                    "noisy": noisy, "removed_bg": removed, "in_size": in_size, "out_size": out_size}
+                    "noisy": noisy, "removed_bg": removed, "dims": [im.size[0], im.size[1]],
+                    "orig_dims": [w, h], "in_size": in_size, "out_size": out_size}
         except Exception as e:
             return {"error": str(e)}

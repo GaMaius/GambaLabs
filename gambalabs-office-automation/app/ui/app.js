@@ -279,7 +279,8 @@ async function vectorize() {
     if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); }
     else {
       const kb = (n) => (n / 1024).toFixed(0) + "KB";
-      const ds = (r.downscaled ? " · 축소 후 변환" : "") + (r.removed_bg ? " · 배경 제거됨" : "");
+      const dm = r.dims ? ` · ${r.dims[0]}×${r.dims[1]}px` + (r.orig_dims && r.dims[0] === r.orig_dims[0] ? "(원본)" : "") : "";
+      const ds = dm + (r.removed_bg ? " · 배경 제거됨" : "");
       show(box, `<span class="ok">✅ 변환 완료</span> <span class="mono">${kb(r.in_size)} → ${kb(r.out_size)} SVG</span>${ds} <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
       if (r.preview && r.svg) {
         show($("vecPreview"), `<div class="vecprev-lbl">미리보기 (벡터)</div><div class="vecprev-box">${r.svg}</div>`);
