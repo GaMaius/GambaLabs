@@ -30,17 +30,59 @@ document.querySelectorAll(".nav button").forEach((b) => {
     b.classList.add("active"); $("tab-" + b.dataset.tab).classList.add("active");
   };
 });
+/* ── 모드별 인라인 설명(무엇을·어떻게) ── */
+const PPT_MODEHELP = {
+  theme: ["var(--purple)", "✱", "테마 개발", "디자인 설정(색·폰트·배경)으로 재사용 가능한 나만의 브랜드 테마를 만들어 저장합니다. 만든 테마는 🎨 목록에서 골라 다른 발표에도 씁니다.", ["① 디자인 설정 입력", "② 테마 이름", "③ 만들기·저장"]],
+  import: ["var(--purple)", "◈", "PPT 디자인", "내용과 설명을 적어둔 러프 PPT(pptx)를 넣으면, AI가 위치·설명을 해석해 브랜드 디자인 덱으로 만듭니다.", ["① PPTX 선택", "② 해석 미리보기", "③ 생성"]],
+  auto: ["var(--purple)", "▤", "자동 생성 PPT", "문서(md·txt) 하나를 통째로 넣으면 AI가 슬라이드로 나눠 브랜드 덱을 자동 생성합니다.", ["① 문서 선택", "② 구성 미리보기", "③ 생성"]],
+  prompt: ["var(--purple)", "✎", "프롬프트 생성", "디자인 설정과 주제를 묶어 GPT·Claude·Gemini 등 아무 LLM에 붙여넣을 프롬프트를 만들어 복사합니다.", ["① 주제 입력", "② 옵션", "③ 생성·복사"]],
+};
+const DATA_MODEHELP = {
+  exp: ["var(--teal)", "📈", "실험/재무 기록 + 자동 차트", "결과를 자연어로 적으면 트래커에 한 줄로 기록하고 추이 차트를 자동 갱신합니다. 같은 파일에 계속 누적돼요.", ["① 트래커 선택/생성", "② 기록 미리보기", "③ 기록 + 차트"]],
+  dash: ["var(--teal)", "▤", "대시보드 수정", "기존 엑셀을 자연어로 수정합니다. 수식·차트는 그대로 두고 값만 바꿔요.", ["① 엑셀 선택 + 요청", "② 변경 미리보기", "③ 적용"]],
+  analyze: ["var(--teal)", "🔎", "분석 · 요약", "엑셀을 AI가 읽고 핵심 요약·추세·이상치·최적 조건을 알려줍니다.", ["① 엑셀 선택", "② 분석/요약"]],
+};
+function mhRender(el, spec) {
+  if (!el || !spec) return;
+  const [color, ic, t, d, steps] = spec;
+  el.style.borderLeftColor = color;
+  el.innerHTML = `<span class="modehelp-ic" style="background:${color}">${ic}</span><div><div class="modehelp-t">${esc(t)}</div><div class="modehelp-d">${esc(d)}</div><div class="modehelp-s">${steps.map((s) => `<span>${esc(s)}</span>`).join("")}</div></div>`;
+}
+
 /* 모드 토글 */
 function pptMode(m) {
   document.querySelectorAll('#tab-ppt .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
   ["theme", "import", "auto", "prompt"].forEach((k) => $("ppt-" + k).classList.toggle("hidden", k !== m));
   $("ppt-float").classList.add("hidden");  // 플로팅 편집기: 현재 숨김(코드 보존)
   $("designForm").classList.remove("hidden");  // 디자인 설정: 모드 공통 노출
+  mhRender($("ppt-modehelp"), PPT_MODEHELP[m]);
 }
 function dataMode(m) {
   document.querySelectorAll('#tab-data .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
   ["exp", "dash", "analyze"].forEach((k) => $("data-" + k).classList.toggle("hidden", k !== m));
+  mhRender($("data-modehelp"), DATA_MODEHELP[m]);
 }
+/* 클립보드 복사(공용) */
+function copyText(txt) {
+  let ok = false;
+  const ta = document.createElement("textarea");
+  ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { ok = document.execCommand("copy"); } catch (e) {}
+  try { if (navigator.clipboard) { navigator.clipboard.writeText(txt); ok = true; } } catch (e) {}
+  document.body.removeChild(ta); return ok;
+}
+/* 실험 로거 스니펫(실제 프로젝트 경로 삽입) */
+async function fillSnippet() {
+  const el = $("expSnippet"); if (!el) return;
+  let dir = "";
+  try { dir = await api().project_dir(); } catch (e) {}
+  el.textContent =
+    `import sys; sys.path.insert(0, r"${dir || '...\\\\gambalabs-office-automation'}")\n` +
+    `from gamba_log import log_result\n\n` +
+    `log_result({"정확도(%)": 92.3, "SNR(dB)": -20, "오인식(건)": 1, "비고": "튜닝"})`;
+}
+function copySnippet() { const el = $("expSnippet"); if (el) copyText(el.textContent); }
 
 /* 상태 */
 const MODEL_LABEL = (m) => ({ "qwen2.5:7b-instruct": "Qwen2.5 7B · 정확·느림", "qwen2.5:3b-instruct": "Qwen2.5 3B · 빠름", "gpt-4o": "GPT-4o (온라인)" }[m] || m);
@@ -52,6 +94,7 @@ async function initStatus() {
     const sel = $("modelSel"); sel.innerHTML = "";
     r.options.forEach((m) => { const o = document.createElement("option"); o.value = m; o.textContent = MODEL_LABEL(m); if (m === r.current) o.selected = true; sel.appendChild(o); });
     refreshThemes(await api().get_themes());
+    fillSnippet();
   } catch (e) {}
 }
 let THEME_OPTS = [];
@@ -273,13 +316,13 @@ async function openFloat() {
 function openHelp() { $("helpModal").classList.remove("hidden"); }
 function closeHelp() { $("helpModal").classList.add("hidden"); }
 function helpDontShow() { localStorage.setItem("helpHide", $("helpDontShow").checked ? "1" : "0"); }
-(function () {
-  const hide = localStorage.getItem("helpHide") === "1";
-  const cb = $("helpDontShow"); if (cb) cb.checked = hide;
-  if (!hide) openHelp();   // 처음 쓰는 사람에게 자동 노출(체크 시 중단)
-})();
+// 온보딩 모달은 자동으로 띄우지 않는다 — 각 탭·모드에 인라인 설명이 항상 보이므로.
+// 전체 개요가 필요하면 사이드바 ❓로 연다.
 window.addEventListener("pywebviewready", initStatus);
 renderRefs(); markFilled();   // 폼 초기 상태(참고자료 목록·배지·스와치)
+mhRender($("ppt-modehelp"), PPT_MODEHELP.theme);   // 초기 모드 설명
+mhRender($("data-modehelp"), DATA_MODEHELP.exp);
+fillSnippet();   // 경로 미확정 시 폴백 표시(이후 initStatus에서 실제 경로로 갱신)
 
 /* ── PPT 풀 자동 ── */
 async function pickPpt() { const p = await api().pick_file("doc"); if (p) { PPT = p; setPath("pptPath", p); } }

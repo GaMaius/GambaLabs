@@ -45,6 +45,8 @@
               onclick="deleteCurrentTheme()" title="현재 커스텀 테마 삭제">🗑</button></div>
         </div>
 
+        <div id="ppt-modehelp" class="modehelp"></div>
+
         <!-- skill 기반 디자인 질문 입력 폼 (테마개발·PPT디자인·자동생성 공용) -->
         <details id="designForm" class="qform" open>
           <summary class="qform-head">🎨 디자인 설정 <span>— 답할수록 결과가 의도에 가까워집니다. 채운 항목은 <b class="qdone-dot">●</b>로 표시돼요.</span></summary>
@@ -216,14 +218,16 @@
             data-m="dash" onclick="dataMode('dash')">대시보드 수정</button><button data-m="analyze"
             onclick="dataMode('analyze')">분석/요약</button></div>
 
+        <div id="data-modehelp" class="modehelp"></div>
+
         <div id="data-exp">
           <div class="card" style="border-style:dashed">
-            <h3>⚡ 실험 스크립트에 심기 (가장 간편)</h3>
-            <div class="hint">실험 코드 끝에 아래 한 줄이면 결과가 트래커에 자동 누적 + 차트 갱신 (수동 입력 불필요).</div>
-            <div class="mono"
-              style="background:var(--canvas);border:1px solid var(--hairline);border-radius:6px;padding:10px;white-space:pre-wrap">
-              from gamba_log import log_result
-              log_result({"정확도(%)": 92.3, "SNR(dB)": -20, "오인식(건)": 1})</div>
+            <h3>⚡ 실험 스크립트에 심기 (수동 입력 없이 자동 기록) <span style="flex:1"></span><button class="btn btn-util"
+                onclick="copySnippet()">📋 복사</button></h3>
+            <div class="hint">실험 코드 끝에 아래를 붙이면 실행할 때마다 결과가 트래커에 자동 누적 + 차트 갱신됩니다.
+              <span class="warn">gamba_log는 이 프로그램 폴더 안의 파일이라, 스크립트에서 쓰려면 경로 추가가 필요합니다(아래 첫 줄).</span></div>
+            <pre id="expSnippet" class="codebox">불러오는 중…</pre>
+            <div class="qnote">openpyxl이 설치된 파이썬에서 실행하세요. 트래커 파일 위치를 바꾸려면 <span class="mono">log_result(..., tracker="경로.xlsx")</span>.</div>
           </div>
           <div class="card">
             <h3><span class="step-no">1</span> 트래커 &amp; 결과 <span
@@ -312,6 +316,15 @@
         <div class="head">
           <h1>SVG 변환</h1>
           <p>로고·아이콘·이미지를 확대해도 안 깨지는 SVG 벡터로 변환합니다. (visioncortex vtracer, 로컬 처리)</p>
+        </div>
+        <div class="modehelp">
+          <span class="modehelp-ic" style="background:var(--orange)">❖</span>
+          <div>
+            <div class="modehelp-t">비트맵 → SVG 벡터</div>
+            <div class="modehelp-d">PNG·JPG 등 픽셀 이미지를 확대해도 안 깨지는 벡터(SVG)로 변환합니다. 로고·아이콘은 완벽, 사진은
+              색 단순화·해상도로 근사. 모두 로컬에서 처리(외부 전송 없음).</div>
+            <div class="modehelp-s"><span>① 이미지 선택</span><span>② 옵션(색·해상도·배경제거)</span><span>③ 변환</span></div>
+          </div>
         </div>
         <div class="card">
           <h3><span class="step-no">1</span> 이미지 선택</h3>
@@ -440,7 +453,6 @@
           <div>❖ 벡터 변환 — 로고·아이콘은 완벽, 사진은 <b>색 단순화·해상도</b>↑로 근사(용량↑)</div>
         </div>
       </div>
-      <label class="chk" style="margin-top:6px"><input type="checkbox" id="helpDontShow" onchange="helpDontShow()"> 다음부터 자동으로 열지 않기</label>
     </div>
   </div>
   <script src="app.js"></script>

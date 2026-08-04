@@ -73,6 +73,10 @@ class Api:
             r = self._window.create_file_dialog(webview.OPEN_DIALOG)
         return r[0] if r else ""
 
+    def project_dir(self):
+        """실험 로거(gamba_log) 스니펫에 넣을 프로젝트 폴더 경로."""
+        return PROJECT_DIR
+
     def open_folder(self, path):
         try:
             os.startfile(path if os.path.isdir(path) else os.path.dirname(path))

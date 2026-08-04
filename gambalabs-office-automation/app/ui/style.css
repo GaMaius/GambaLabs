@@ -163,6 +163,14 @@ table.chg td .to{color:var(--green);font-weight:600}
 .help-mini{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--ink-muted);line-height:1.5}
 .help-mini b{color:var(--ink-2)}
 /* skill 기반 디자인 설정 폼 */
+/* 모드별 인라인 설명 — 각 탭·모드가 무엇을/어떻게 하는지 항상 표시 */
+.modehelp{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--hairline);border-left:3px solid var(--primary);border-radius:var(--r-md);padding:12px 14px;margin-bottom:var(--sp-md)}
+.modehelp-ic{width:34px;height:34px;flex:0 0 34px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
+.modehelp-t{font-size:14.5px;font-weight:700;color:var(--ink)}
+.modehelp-d{font-size:12.5px;color:var(--ink-muted);margin-top:3px;line-height:1.55}
+.modehelp-s{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.modehelp-s span{font-size:11.5px;background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-full);padding:3px 10px;color:var(--ink-2);font-weight:600}
+.codebox{background:var(--canvas);border:1px solid var(--hairline);border-radius:6px;padding:11px 12px;white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--ink-2);overflow-x:auto;margin:2px 0}
 .qform{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:var(--sp-md);margin-bottom:var(--sp-md)}
 .qform-head{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:8px}
 .qform-head span{font-weight:400;font-size:12.5px;color:var(--ink-muted)}
