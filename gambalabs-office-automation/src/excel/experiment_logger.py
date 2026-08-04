@@ -93,20 +93,64 @@ class ExperimentLogger:
                 print(f"[ExperimentLogger] LLM 파싱 실패({e}) → 규칙 기반")
         return self.parse_result(text, headers, next_round)
 
-    def _rebuild_chart(self, ws, n_data: int, value_col: int = 3, cat_col: int = 1, anchor: str = "H2"):
+    _PALETTE = ["0038A3", "2A9D99", "E5484D", "D9A400", "6E56CF", "1970AE"]
+
+    def _rebuild_chart(self, ws, n_data: int, value_col: int = 3, cat_col: int = 1,
+                       anchor: str = "H2", value_cols: List[int] = None):
+        """추이 라인차트 재생성. value_cols가 주어지면 다중 지표(시리즈)로 그린다."""
         ws._charts = []  # 기존 차트 제거 후 재생성(범위 자동 확장)
         chart = LineChart()
-        chart.title = "추이"
+        cols = [c for c in (value_cols or [value_col]) if c]
+        chart.title = "지표 추이" if len(cols) > 1 else "추이"
         chart.height, chart.width = 8, 18
         chart.y_axis.majorGridlines = None
-        data = Reference(ws, min_col=value_col, min_row=1, max_row=1 + n_data)
         cats = Reference(ws, min_col=cat_col, min_row=2, max_row=1 + n_data)
-        chart.add_data(data, titles_from_data=True)
+        for c in cols:
+            data = Reference(ws, min_col=c, min_row=1, max_row=1 + n_data)
+            chart.add_data(data, titles_from_data=True)
         chart.set_categories(cats)
-        if chart.series:
-            chart.series[0].graphicalProperties.line.solidFill = "0038A3"
-            chart.series[0].graphicalProperties.line.width = 28000
+        for i, ser in enumerate(chart.series):
+            ser.graphicalProperties.line.solidFill = self._PALETTE[i % len(self._PALETTE)]
+            ser.graphicalProperties.line.width = 28000
+            ser.smooth = False
+        if len(cols) > 1:
+            chart.legend.position = "b"
+        else:
+            chart.legend = None
         ws.add_chart(chart, anchor)
+
+    def _numeric_value_cols(self, ws, headers) -> List[int]:
+        """차트에 쓸 수치 지표 열 목록(회차·날짜·비고 등 키/텍스트 열 제외)."""
+        SKIP = ("회차", "날짜", "일자", "비고", "메모", "구분", "이름", "항목")
+        r = ws.max_row if ws.max_row >= 2 else 2
+        cols = []
+        for ci in range(2, len(headers) + 1):
+            hs = str(headers[ci - 1] or "")
+            if any(k in hs for k in SKIP):
+                continue
+            v = ws.cell(row=r, column=ci).value
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                cols.append(ci)
+        return cols
+
+    def create_tracker(self, path: str, headers: List[str], title: str = "기록") -> Dict[str, Any]:
+        """지정한 헤더로 빈 트래커 워크북 생성(첫 기록부터 차트가 붙도록 준비)."""
+        headers = [str(h).strip() for h in headers if str(h).strip()]
+        if not headers:
+            raise ValueError("헤더가 비었습니다.")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = (title or "기록")[:31]
+        ws.append(headers)
+        from openpyxl.styles import Font, PatternFill
+        for c in ws[1]:
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = PatternFill("solid", fgColor="0038A3")
+        for i, _h in enumerate(headers, 1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 14
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        wb.save(path)
+        return {"out": path, "headers": headers, "sheet": ws.title}
 
     @staticmethod
     def _clean(s: str) -> str:
@@ -172,7 +216,8 @@ class ExperimentLogger:
                 "engine": ("AI 파싱" if (use_llm and self._llm_available()) else "규칙 기반")}
 
     def append_result(self, xlsx_path: str, description: str, output_path: str,
-                      value_col: int = None, use_llm: bool = False) -> Dict[str, Any]:
+                      value_col: int = None, use_llm: bool = False,
+                      chart_mode: str = "auto") -> Dict[str, Any]:
         wb = openpyxl.load_workbook(xlsx_path)
         ws = self._sheet(wb)
         headers = [c.value for c in ws[1]]
@@ -180,13 +225,18 @@ class ExperimentLogger:
         row = self.parse(description, headers, next_round=data_rows + 1, use_llm=use_llm)
         ws.append(row)
         n_data = ws.max_row - 1
-        vc = value_col or self._value_col_index(ws, headers)   # 하드코딩 대신 자동 감지
-        self._rebuild_chart(ws, n_data, value_col=vc)
+        if chart_mode == "all":
+            vcols = self._numeric_value_cols(ws, headers) or [self._value_col_index(ws, headers)]
+            self._rebuild_chart(ws, n_data, value_cols=vcols)
+            metric = ", ".join(str(headers[c - 1]) for c in vcols if 0 < c <= len(headers))
+        else:
+            vc = value_col or self._value_col_index(ws, headers)   # 하드코딩 대신 자동 감지
+            self._rebuild_chart(ws, n_data, value_col=vc)
+            metric = str(headers[vc - 1]) if 0 < vc <= len(headers) else ""
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         wb.save(output_path)
         return {"sheet": ws.title, "appended": dict(zip([str(h) for h in headers], row)),
-                "total_rows": n_data, "out": output_path,
-                "chart_metric": str(headers[vc - 1]) if 0 < vc <= len(headers) else "",
+                "total_rows": n_data, "out": output_path, "chart_metric": metric,
                 "engine": ("AI 파싱" if (use_llm and self._llm_available()) else "규칙 기반")}
 
 

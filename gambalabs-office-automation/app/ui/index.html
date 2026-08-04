@@ -201,10 +201,26 @@
             <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickExp()">트래커 엑셀</button>
               <div class="pathbox empty" id="expPath">선택된 파일 없음</div>
             </div>
-            <div class="hint">결과를 자연어로 적으면 한 줄로 기록하고 추이 차트를 자동 갱신합니다.</div>
+            <details class="qitem" style="border-top:1px solid var(--hairline)">
+              <summary>＋ 새 트래커 만들기 (없으면)</summary>
+              <div class="qbody">
+                <div class="hint">기록할 <b>컬럼(헤더)</b>을 쉼표로 구분해 적으세요. '회차'·'날짜'는 자동 채워집니다.</div>
+                <input id="tkHeaders" placeholder="회차, 날짜, 정확도(%), SNR(dB), 오인식(건), 비고" style="width:100%">
+                <div class="row" style="margin-top:8px"><input id="tkName" placeholder="파일/시트 이름 (예: 실험기록)" style="flex:1">
+                  <button class="btn btn-util" onclick="newTracker()">만들기 · 저장</button></div>
+                <div id="tkResult" class="result hidden"></div>
+              </div>
+            </details>
+            <div class="hint" style="margin-top:10px">결과를 자연어로 적으면 한 줄로 기록하고 추이 차트를 자동 갱신합니다.</div>
             <textarea id="expText" placeholder="예) 4회차 정확도 92.3%, SNR -20dB, 오인식 1건, 노이즈 강인성 개선"></textarea>
             <label class="toggle"><input type="checkbox" id="expLLM"> <span><b>AI 파싱 (Ollama)</b> — 조사·표현이 자유로워도 컬럼에 맞게
                 해석해 기록. 끄면 규칙 기반(즉시). <span class="warn">켜면 로컬 모델이라 수 초~수십 초</span></span></label>
+            <div class="optrow" style="margin-top:10px">
+              <label>차트 지표<select id="expChart" class="modelsel">
+                  <option value="auto">단일 지표 (자동 선택)</option>
+                  <option value="all">모든 수치 지표</option>
+                </select></label>
+            </div>
           </div>
           <div class="card">
             <h3><span class="step-no">2</span> 기록 미리보기 <span style="flex:1"></span><button class="btn btn-ghost"

@@ -467,7 +467,7 @@ class Api:
         except Exception as e:
             return {"error": str(e)}
 
-    def exp_log(self, xlsx_path, description, use_llm=False):
+    def exp_log(self, xlsx_path, description, use_llm=False, chart_mode="auto"):
         if not xlsx_path or not os.path.exists(xlsx_path):
             return {"error": "트래커 엑셀을 선택하세요."}
         if not (description or "").strip():
@@ -475,8 +475,36 @@ class Api:
         try:
             llm = bool(use_llm) and self._import_can_llm()
             out = os.path.join(OUTPUT, _ts("experiment_logged", "xlsx"))
-            res = ExperimentLogger().append_result(xlsx_path, description, out, use_llm=llm)
+            res = ExperimentLogger().append_result(xlsx_path, description, out, use_llm=llm,
+                                                    chart_mode=(chart_mode or "auto"))
             return res
+        except Exception as e:
+            return {"error": str(e)}
+
+    def create_tracker(self, headers_text, name=""):
+        """사용자가 지정한 헤더로 새 트래커 xlsx를 만든다(저장 위치는 다이얼로그로 선택)."""
+        import re as _re
+        import webview
+        cols = [h.strip() for h in _re.split(r"[,\n\t]", headers_text or "") if h.strip()]
+        if not cols:
+            return {"error": "헤더를 쉼표로 구분해 입력하세요. (예: 회차, 날짜, 정확도(%), 비고)"}
+        default = ((name or "").strip() or "tracker") + ".xlsx"
+        try:
+            path = self._window.create_file_dialog(
+                webview.SAVE_DIALOG, save_filename=default,
+                file_types=("엑셀 (*.xlsx)", "All files (*.*)"))
+        except Exception as e:
+            return {"error": f"저장 위치 선택 실패: {e}"}
+        if not path:
+            return {"cancelled": True}
+        if isinstance(path, (list, tuple)):
+            path = path[0]
+        path = str(path)
+        if not path.lower().endswith(".xlsx"):
+            path += ".xlsx"
+        try:
+            r = ExperimentLogger().create_tracker(path, cols, title=((name or "").strip() or "기록"))
+            return r
         except Exception as e:
             return {"error": str(e)}
 

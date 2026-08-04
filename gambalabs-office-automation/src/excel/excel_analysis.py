@@ -9,7 +9,9 @@ import os
 from typing import Optional, Dict, Any
 
 
-def build_context(xlsx_path: str, max_rows: int = 12) -> str:
+def build_context(xlsx_path: str, max_rows: int = 24) -> str:
+    """LLM 분석용 문맥. 큰 시트는 상·하위 샘플 + 전체 통계 + 추세 요약으로 압축해
+    행이 많아도 핵심 근거를 잃지 않게 한다(약한 로컬 모델도 판단하도록 결정적 요약 제공)."""
     import pandas as pd
     dfs = pd.read_excel(xlsx_path, sheet_name=None)  # 전 시트
     parts = []
@@ -19,10 +21,26 @@ def build_context(xlsx_path: str, max_rows: int = 12) -> str:
         parts.append("컬럼: " + ", ".join(map(str, df.columns)))
         num = df.select_dtypes("number")
         if not num.empty:
-            parts.append("수치 요약:\n" + num.describe().round(2).to_string())
-        parts.append("데이터(상위):\n" + df.head(max_rows).to_string(index=False))
+            parts.append("수치 요약(전체 행 기준):\n" + num.describe().round(2).to_string())
+            trends = []
+            for c in num.columns:
+                s = num[c].dropna()
+                if len(s) >= 2:
+                    d = float(s.iloc[-1]) - float(s.iloc[0])
+                    arrow = "▲" if d > 0 else ("▼" if d < 0 else "→")
+                    trends.append(f"{c}: {round(float(s.iloc[0]),2)}→{round(float(s.iloc[-1]),2)} ({arrow}{round(abs(d),2)})")
+            if trends:
+                parts.append("처음→마지막 추세: " + " | ".join(trends))
+        # 큰 시트는 상·하위만 샘플(중간 생략), 작으면 전체
+        if len(df) > max_rows:
+            half = max_rows // 2
+            parts.append(f"데이터(상위 {half}행):\n" + df.head(half).to_string(index=False))
+            parts.append(f"… (중간 {len(df) - max_rows}행 생략) …")
+            parts.append(f"데이터(하위 {half}행):\n" + df.tail(half).to_string(index=False))
+        else:
+            parts.append("데이터(전체):\n" + df.to_string(index=False))
         parts.append("")
-    return "\n".join(parts)[:6000]
+    return "\n".join(parts)[:9000]
 
 
 def analyze(xlsx_path: str, question: Optional[str] = None) -> Dict[str, Any]:
