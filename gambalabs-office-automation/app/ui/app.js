@@ -33,9 +33,9 @@ document.querySelectorAll(".nav button").forEach((b) => {
 /* 모드 토글 */
 function pptMode(m) {
   document.querySelectorAll('#tab-ppt .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
-  ["theme", "import", "auto"].forEach((k) => $("ppt-" + k).classList.toggle("hidden", k !== m));
+  ["theme", "import", "auto", "prompt"].forEach((k) => $("ppt-" + k).classList.toggle("hidden", k !== m));
   $("ppt-float").classList.add("hidden");  // 플로팅 편집기: 현재 숨김(코드 보존)
-  $("designForm").classList.remove("hidden");  // 디자인 설정: 3모드 공통 노출
+  $("designForm").classList.remove("hidden");  // 디자인 설정: 모드 공통 노출
 }
 function dataMode(m) {
   document.querySelectorAll('#tab-data .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
@@ -227,6 +227,37 @@ function refreshSeedThemes() {
   sel.innerHTML = `<option value="">직접 지정</option>`;
   (THEME_OPTS || []).forEach((t) => { const o = document.createElement("option"); o.value = t.id; o.textContent = t.label + (t.custom ? " (커스텀)" : ""); sel.appendChild(o); });
   sel.value = keep;
+}
+
+/* ── 프롬프트 생성(범용 LLM에 붙여넣기) ── */
+async function genPrompt() {
+  const f = readDesignForm();
+  const tsel = $("themeSel");
+  const themeLabel = (tsel && tsel.selectedOptions[0]) ? tsel.selectedOptions[0].textContent : "";
+  const payload = {
+    topic: $("promptTopic").value.trim(),
+    purpose: f.purpose, direction: f.direction, ratio: f.ratio,
+    bg_tone: $("qBgTone").dataset.val, accent: f.accent, ink: f.ink,
+    gradient: f.gradient, font: f.font, refs: f.refs,
+    theme_label: themeLabel, output: $("promptOut").value, strict: $("promptStrict").value === "1",
+  };
+  const box = $("promptResult"); spin(box, "프롬프트 조립 중…"); show(box);
+  try {
+    const r = await api().gen_ppt_prompt(payload);
+    if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
+    const ta = $("promptOutput"); ta.value = r.prompt; ta.classList.remove("hidden");
+    $("promptCopyBtn").classList.remove("hidden");
+    show(box, `<span class="ok">✅ 생성됨</span> — 복사해서 GPT · Claude · Gemini 등에 붙여넣으세요. (${r.prompt.length}자)`);
+  } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
+}
+function copyPrompt() {
+  const ta = $("promptOutput"); if (!ta.value) return;
+  ta.focus(); ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) {}
+  try { if (navigator.clipboard) { navigator.clipboard.writeText(ta.value); ok = true; } } catch (e) {}
+  const b = $("promptCopyBtn"); const t = b.textContent;
+  b.textContent = ok ? "✓ 복사됨" : "복사 실패"; setTimeout(() => (b.textContent = t), 1200);
 }
 
 /* ── 플로팅 편집기(현재 UI 숨김, 코드 보존) ── */

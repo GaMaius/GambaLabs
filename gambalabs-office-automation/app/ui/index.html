@@ -37,7 +37,8 @@
         <div class="toolbar">
           <div class="seg"><button class="on" data-m="theme" onclick="pptMode('theme')">테마 개발</button><button
               data-m="import" onclick="pptMode('import')">PPT 디자인</button><button data-m="auto"
-              onclick="pptMode('auto')">자동 생성 PPT</button></div>
+              onclick="pptMode('auto')">자동 생성 PPT</button><button data-m="prompt"
+              onclick="pptMode('prompt')">프롬프트 생성</button></div>
           <div class="themepick"><span class="themepick-label">🎨 디자인 테마</span><select id="themeSel" class="modelsel"
               onchange="onThemeChange()"></select><button class="iconbtn" onclick="openThemeModal()"
               title="테마 추가·제작">＋</button><button class="iconbtn danger hidden" id="themeDelBtn"
@@ -172,6 +173,37 @@
             <div class="row"><button class="btn btn-primary" id="importGoBtn" onclick="makeImport()">브랜드 디자인 생성</button>
             </div>
             <div id="importResult" class="result hidden"></div>
+          </div>
+        </div>
+
+        <div id="ppt-prompt" class="hidden">
+          <div class="card">
+            <h3><span class="step-no">1</span> 발표 주제 · 내용</h3>
+            <div class="hint">위 <b>디자인 설정</b>(색·폰트·목적·참고자료)과 아래 주제를 묶어, 아무 LLM(GPT·Claude·Gemini)에 붙여넣을
+              프롬프트를 만듭니다. 테마 색을 쓰려면 디자인 설정의 <b>기반 테마</b>로 색을 채우세요.</div>
+            <textarea id="promptTopic" placeholder="예) 감바랩스 WordSense 기술 소개, 투자사 대상. 성능 수치 강조 — 또는 문서 원문을 붙여넣기"></textarea>
+          </div>
+          <div class="card">
+            <h3><span class="step-no">2</span> 옵션</h3>
+            <div class="optrow">
+              <label>출력 형식<select id="promptOut" class="modelsel">
+                  <option value="plan">슬라이드 구성안 (표)</option>
+                  <option value="code">생성 코드 (pptxgenjs·python-pptx)</option>
+                  <option value="both">둘 다</option>
+                </select></label>
+              <label>규칙 강도<select id="promptStrict" class="modelsel">
+                  <option value="0">자유 (강한 모델 권장)</option>
+                  <option value="1">엄격 (내용 충실)</option>
+                </select></label>
+            </div>
+          </div>
+          <div class="card">
+            <h3><span class="step-no">3</span> 프롬프트 <span style="flex:1"></span><button class="btn btn-util hidden"
+                id="promptCopyBtn" onclick="copyPrompt()">📋 복사</button></h3>
+            <div class="row"><button class="btn btn-primary" onclick="genPrompt()">프롬프트 생성</button></div>
+            <textarea id="promptOutput" class="hidden" readonly
+              style="min-height:230px;margin-top:10px;font-size:12.5px;line-height:1.5"></textarea>
+            <div id="promptResult" class="result hidden"></div>
           </div>
         </div>
       </section>

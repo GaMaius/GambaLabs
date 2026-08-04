@@ -216,6 +216,93 @@ class Api:
                 parts.append(f"[참고자료 {i}: {name}] (내용 텍스트 없음 — 디자인 참고용 파일)")
         return "\n\n".join(parts).strip()
 
+    def gen_ppt_prompt(self, opts=None):
+        """디자인 설정/테마/내용으로, 범용 LLM(GPT·Claude·Gemini 등)에 붙여넣어 발표자료를
+        만들게 하는 자립형 프롬프트를 조립해 반환한다(복사용)."""
+        o = opts or {}
+
+        def g(k, d=""):
+            v = o.get(k)
+            return (str(v).strip() if v is not None else d)
+
+        topic = g("topic")
+        purpose = g("purpose")
+        direction = g("direction")
+        ratio = g("ratio", "16:9")
+        bg_tone = g("bg_tone", "light")
+        accent = g("accent", "0038A3").lstrip("#").upper()
+        ink = g("ink", "1A1A1A").lstrip("#").upper()
+        font = g("font", "맑은 고딕")
+        gradient = bool(o.get("gradient"))
+        theme_label = g("theme_label")
+        output = g("output", "plan")           # plan | code | both
+        strict = bool(o.get("strict"))
+        refs = [r for r in (o.get("refs") or []) if r and os.path.exists(r)]
+
+        bg_desc = ("어두운 배경" if bg_tone == "dark" else "밝은 배경") + (" · 은은한 그라데이션" if gradient else " · 단색")
+
+        ref_block = ""
+        for i, r in enumerate(refs, 1):
+            t = self._load_ref_text(r)
+            name = os.path.basename(r)
+            ref_block += (f"\n[참고자료 {i}: {name}]\n{t}\n" if t else f"\n[참고자료 {i}: {name}] (텍스트 없음 — 디자인 참고용)\n")
+        if not ref_block:
+            ref_block = "\n(없음)\n"
+
+        rule_mode = (
+            "- 사용자가 준 구조를 존중하되, 각 슬라이드에 가장 알맞은 레이아웃을 스스로 '설계'하라. 자유도를 살려라."
+            if not strict else
+            "- 정해진 규칙을 엄격히 지켜라. 임의로 항목을 추가·과장하지 말고, 준 내용에 충실하라."
+        )
+
+        out_blocks = {
+            "plan": (
+                "[출력 형식]\n"
+                "슬라이드별로 아래 표로 제시하라. 그리고 표지 제목 문장과 마무리 문구도 제안하라.\n"
+                "| # | 제목 | 레이아웃 유형 | 핵심 내용(짧은 불릿) | 디자인 노트(색·강조·시각요소) |"
+            ),
+            "code": (
+                "[출력 형식]\n"
+                f"이 덱을 생성하는 완전한 코드를 작성하라. pptxgenjs(Node.js) 또는 python-pptx 중 하나로, 비율 {ratio}"
+                "(16:9면 13.333×7.5인치), 위 색·폰트를 그대로 적용. 그대로 실행하면 .pptx가 나오도록 자립형으로."
+            ),
+        }
+        out_blocks["both"] = out_blocks["plan"] + "\n\n그다음, " + out_blocks["code"]
+        out_block = out_blocks.get(output, out_blocks["plan"])
+
+        prompt = f"""너는 한국어 발표자료(PPT)를 설계하는 전문 디자이너다. 아래 [내용]과 [디자인 설정]에 맞춰 완성도 높은 슬라이드 덱을 설계하라.
+
+[발표 주제·내용]
+{topic or "※ 여기에 발표 주제 또는 원문(문서 텍스트)을 붙여넣으세요."}
+
+[목적·대상·톤]
+{purpose or "(미지정)"}
+
+[제작자 추가 디렉션 — 최대한 반영]
+{direction or "(없음)"}
+
+[디자인 설정]
+- 비율: {ratio}
+- 배경: {bg_desc}
+- 강조색(포인트): #{accent}
+- 글자색: #{ink}
+- 폰트: {font}
+- 테마: {theme_label or "지정 색 기반"}
+
+[참고자료 — 사실 근거로만 사용, 그대로 복붙 금지]{ref_block}
+[슬라이드 설계 규칙]
+- 표지·목차·본문·마무리를 모두 갖춘다. 표지는 전체를 관통하는 한 문장 제목 + 어울리는 이미지.
+- 텍스트를 최소화한다. 슬라이드는 읽는 문서가 아니라 '보는' 자료다.
+- 레이아웃을 내용에 맞게 골라 설계: text(불릿 요약) · cards(핵심 항목 2~4개) · table(비교·수치) · metrics(큰 숫자 지표 카드) · compare(2열 비교) · chart(막대/선/원형, 필요시 추세선).
+- 본문 제목·소제목은 세로로 전체의 1/6 이하만 차지. 모든 페이지의 외곽 여백을 일정하게 유지. 도형 안 텍스트는 넘치지 않게 여백을 둔다.
+- 색은 위 강조색·글자색을 일관되게 쓰고, 강조가 필요한 수치·키워드에만 포인트색을 쓴다.
+{rule_mode}
+
+{out_block}
+
+설명 없이 결과물만 출력하라. 한국어로."""
+        return {"prompt": prompt}
+
     def extract_palette(self, image_path=None, n=6):
         """참고 이미지에서 대표색을 추출(Pillow 양자화). 강조/배경/글자 추천색도 함께 반환.
         image_path 없으면 파일 선택 다이얼로그를 띄운다."""
