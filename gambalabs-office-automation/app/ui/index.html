@@ -117,8 +117,7 @@
             <div class="row"><button class="btn btn-util" onclick="pickPpt()">문서 선택</button>
               <div class="pathbox empty" id="pptPath">선택된 문서 없음</div>
             </div>
-            <label class="toggle"><input type="checkbox" id="autoLLM"> <span><b>AI 구조화 (Ollama)</b> — LLM이 문서를 읽고 슬라이드로
-                나눔. 끄면 제목(##) 기준 규칙 분할(즉시). <span class="warn">켜면 로컬 모델이라 수십 초~수 분</span></span></label>
+            <div class="hint">AI(Ollama)가 문서를 읽고 슬라이드 구조로 나눕니다. <span class="warn">로컬 모델이라 수십 초~수 분 소요</span></div>
           </div>
           <div class="card">
             <h3><span class="step-no">2</span> 구성 미리보기 <span style="flex:1"></span><button class="btn btn-ghost"
@@ -159,8 +158,7 @@
             <div class="row"><button class="btn btn-util" onclick="pickImport()">PPTX 선택</button>
               <div class="pathbox empty" id="importPath">선택된 파일 없음</div>
             </div>
-            <label class="toggle"><input type="checkbox" id="importLLM"> <span><b>AI 정밀 해석 (Ollama)</b> — 자유로운 설명까지 이해.
-                끄면 규칙 기반(즉시). <span class="warn">켜면 로컬 모델이라 수십 초~수 분 소요</span></span></label>
+            <div class="hint">AI(Ollama)가 적어둔 설명·위치를 해석해 레이아웃을 설계합니다. <span class="warn">로컬 모델이라 수십 초~수 분 소요</span></div>
           </div>
           <div class="card">
             <h3><span class="step-no">2</span> 해석 미리보기 <span style="flex:1"></span><button class="btn btn-ghost"
@@ -245,8 +243,7 @@
             </details>
             <div class="hint" style="margin-top:10px">결과를 자연어로 적으면 한 줄로 기록하고 추이 차트를 자동 갱신합니다.</div>
             <textarea id="expText" placeholder="예) 4회차 정확도 92.3%, SNR -20dB, 오인식 1건, 노이즈 강인성 개선"></textarea>
-            <label class="toggle"><input type="checkbox" id="expLLM"> <span><b>AI 파싱 (Ollama)</b> — 조사·표현이 자유로워도 컬럼에 맞게
-                해석해 기록. 끄면 규칙 기반(즉시). <span class="warn">켜면 로컬 모델이라 수 초~수십 초</span></span></label>
+            <div class="hint">AI(Ollama)가 문장을 트래커 컬럼에 맞게 해석해 한 줄로 기록합니다. <span class="warn">로컬 모델이라 수 초~수십 초</span></div>
             <div class="optrow" style="margin-top:10px">
               <label>차트 지표<select id="expChart" class="modelsel">
                   <option value="auto">단일 지표 (자동 선택)</option>

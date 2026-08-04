@@ -285,7 +285,7 @@ renderRefs(); markFilled();   // 폼 초기 상태(참고자료 목록·배지·
 async function pickPpt() { const p = await api().pick_file("doc"); if (p) { PPT = p; setPath("pptPath", p); } }
 async function previewPpt() {
   if (!PPT) return alert("문서를 선택하세요.");
-  const llm = $("autoLLM").checked;
+  const llm = true;   // LLM 항상 사용
   spin($("pptOutline"), llm ? "AI가 문서를 구조화 중… (로컬 모델이면 수십 초~수 분)" : "분석 중…"); show($("pptOutline"));
   const r = await api().ppt_preview(PPT, llm);
   if (r.error) return show($("pptOutline"), `<span class="err">${esc(r.error)}</span>`);
@@ -294,7 +294,7 @@ async function previewPpt() {
 }
 async function makePpt() {
   if (!PPT) return alert("문서를 선택하세요.");
-  const llm = $("autoLLM").checked;
+  const llm = true;   // LLM 항상 사용
   spin($("pptResult"), llm ? "AI 구조화 후 생성 중…" : "생성 중…"); show($("pptResult")); $("pptGoBtn").disabled = true;
   await applyFormTheme();   // 디자인 설정을 테마로 적용
   const r = await api().ppt_make_full(PPT, llm); $("pptGoBtn").disabled = false;
@@ -385,7 +385,7 @@ let IMPORT = "";
 async function pickImport() { const p = await api().pick_file("pptx"); if (p) { IMPORT = p; setPath("importPath", p); } }
 async function previewImport() {
   if (!IMPORT) return alert("PPTX를 선택하세요.");
-  const llm = $("importLLM").checked;
+  const llm = true;   // LLM 항상 사용
   spin($("importOutline"), llm ? "AI가 해석 중… (로컬 모델이면 수십 초~수 분)" : "해석 중…"); show($("importOutline"));
   const r = await api().ppt_import_preview(IMPORT, llm);
   if (r.error) return show($("importOutline"), `<span class="err">${esc(r.error)}</span>`);
@@ -395,7 +395,7 @@ async function previewImport() {
 }
 async function makeImport() {
   if (!IMPORT) return alert("PPTX를 선택하세요.");
-  const llm = $("importLLM").checked;
+  const llm = true;   // LLM 항상 사용
   spin($("importResult"), llm ? "AI 해석 후 생성 중…" : "생성 중…"); show($("importResult")); $("importGoBtn").disabled = true;
   await applyFormTheme();   // 디자인 설정을 테마로 적용
   const r = await api().ppt_import_make(IMPORT, llm); $("importGoBtn").disabled = false;
@@ -425,7 +425,7 @@ function expRowTable(headers, mapped, blanks) {
 }
 async function previewExp() {
   if (!EXP) return alert("트래커 엑셀을 선택하세요.");
-  const llm = $("expLLM").checked; const box = $("expPreview");
+  const llm = true; const box = $("expPreview");   // LLM 항상 사용
   spin(box, llm ? "AI가 해석 중… (로컬 모델이면 수 초~수십 초)" : "해석 중…"); show(box);
   const r = await api().exp_log_preview(EXP, $("expText").value, llm);
   if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
@@ -433,7 +433,7 @@ async function previewExp() {
   show(box, `<div class="pill">${esc(r.engine)} · ${esc(r.sheet)}</div>${expRowTable(r.headers, r.mapped, r.blanks)}${warn}`);
 }
 async function logExp() {
-  if (!EXP) return alert("트래커 엑셀을 선택하세요."); const llm = $("expLLM").checked; const cm = $("expChart").value;
+  if (!EXP) return alert("트래커 엑셀을 선택하세요."); const llm = true; const cm = $("expChart").value;   // LLM 항상 사용
   const inPlace = $("expInPlace").checked;
   const box = $("expResult"); spin(box, llm ? "AI 파싱 후 기록 중…" : "기록 중…"); show(box); $("expGoBtn").disabled = true;
   const r = await api().exp_log(EXP, $("expText").value, llm, cm, inPlace); $("expGoBtn").disabled = false;
