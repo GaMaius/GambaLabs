@@ -3,6 +3,8 @@ import re
 import openpyxl
 from typing import List, Dict, Any
 
+from src.excel.table_utils import detect_table
+
 class ExcelUpdater:
     """
     openpyxl 기반 수식, 조건부 서식, 차트를 100% 보존하며 셀 단위 데이터 업데이트를 처리하는 엔진
@@ -55,8 +57,8 @@ class ExcelUpdater:
             target_row = None
             target_col = None
 
-            # 헤더 행 (1행) 탐색
-            header_row = [cell.value for cell in ws[1]]
+            # 헤더 행 탐색 — 1행이 아닐 수 있어 자동 감지(제목·빈 줄 뒤 표 지원)
+            hr, header_row, first_data = detect_table(ws)
             clean_target_col = re.sub(r"[\s()원]", "", str(column_name))
             for col_idx, h_val in enumerate(header_row, start=1):
                 if h_val:
@@ -65,8 +67,8 @@ class ExcelUpdater:
                         target_col = col_idx
                         break
 
-            # 항목 행 (1열 ~ 2열) 탐색
-            for row_idx in range(2, ws.max_row + 1):
+            # 항목 행(헤더 아래 데이터 영역) 탐색
+            for row_idx in range(first_data, ws.max_row + 1):
                 cell_item = ws.cell(row=row_idx, column=1).value
                 if cell_item and (item_name in str(cell_item) or str(cell_item) in item_name):
                     target_row = row_idx

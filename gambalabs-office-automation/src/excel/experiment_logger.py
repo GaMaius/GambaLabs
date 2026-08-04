@@ -96,17 +96,18 @@ class ExperimentLogger:
     _PALETTE = ["0038A3", "2A9D99", "E5484D", "D9A400", "6E56CF", "1970AE"]
 
     def _rebuild_chart(self, ws, n_data: int, value_col: int = 3, cat_col: int = 1,
-                       anchor: str = "H2", value_cols: List[int] = None):
-        """추이 라인차트 재생성. value_cols가 주어지면 다중 지표(시리즈)로 그린다."""
+                       anchor: str = "H2", value_cols: List[int] = None, header_row: int = 1):
+        """추이 라인차트 재생성. value_cols가 주어지면 다중 지표(시리즈)로 그린다.
+        header_row: 헤더가 몇 행에 있는지(1행이 아닐 수 있음) — 데이터 범위 계산에 사용."""
         ws._charts = []  # 기존 차트 제거 후 재생성(범위 자동 확장)
         chart = LineChart()
         cols = [c for c in (value_cols or [value_col]) if c]
         chart.title = "지표 추이" if len(cols) > 1 else "추이"
         chart.height, chart.width = 8, 18
         chart.y_axis.majorGridlines = None
-        cats = Reference(ws, min_col=cat_col, min_row=2, max_row=1 + n_data)
+        cats = Reference(ws, min_col=cat_col, min_row=header_row + 1, max_row=header_row + n_data)
         for c in cols:
-            data = Reference(ws, min_col=c, min_row=1, max_row=1 + n_data)
+            data = Reference(ws, min_col=c, min_row=header_row, max_row=header_row + n_data)
             chart.add_data(data, titles_from_data=True)
         chart.set_categories(cats)
         for i, ser in enumerate(chart.series):
@@ -191,47 +192,59 @@ class ExperimentLogger:
 
     def append_row(self, xlsx_path: str, data: Dict[str, Any], output_path: str = None) -> Dict[str, Any]:
         """구조화된 dict를 트래커에 한 행 추가(파서 없이). 스크립트 연동용."""
+        from src.excel.table_utils import detect_table
+        from openpyxl.utils import get_column_letter
         wb = openpyxl.load_workbook(xlsx_path)
         ws = self._sheet(wb)
-        headers = [c.value for c in ws[1]]
-        row = self._row_from_dict(headers, data, ws.max_row)
-        ws.append(row)
-        n_data = ws.max_row - 1
-        self._rebuild_chart(ws, n_data, value_col=self._value_col_index(ws, headers))
+        hr, headers, _ = detect_table(ws)
+        row = self._row_from_dict(headers, data, ws.max_row - hr + 1)
+        target = ws.max_row + 1                      # 빈 줄이 있어도 정확히 데이터 끝 다음에 기록
+        for ci, val in enumerate(row, start=1):
+            ws.cell(row=target, column=ci, value=val)
+        n_data = target - hr
+        anchor = get_column_letter(len(headers) + 2) + str(hr)
+        self._rebuild_chart(ws, n_data, value_col=self._value_col_index(ws, headers),
+                            header_row=hr, anchor=anchor)
         out = output_path or xlsx_path  # 기본은 제자리 업데이트(누적)
         wb.save(out)
         return {"sheet": ws.title, "appended": dict(zip([str(h) for h in headers], row)), "total_rows": n_data, "out": out}
 
     def preview_result(self, xlsx_path: str, description: str, use_llm: bool = False) -> Dict[str, Any]:
         """저장하지 않고, 자연어 설명이 어떤 한 행으로 기록될지 미리 보여준다."""
+        from src.excel.table_utils import detect_table
         wb = openpyxl.load_workbook(xlsx_path)
         ws = self._sheet(wb)
-        headers = [c.value for c in ws[1]]
-        data_rows = ws.max_row - 1
+        hr, headers, _ = detect_table(ws)
+        data_rows = ws.max_row - hr
         row = self.parse(description, headers, next_round=data_rows + 1, use_llm=use_llm)
         hstr = [str(h) for h in headers]
         blanks = [hstr[i] for i, v in enumerate(row) if v in (None, "")]
-        return {"sheet": ws.title, "headers": hstr, "row": row,
+        return {"sheet": ws.title, "headers": hstr, "row": row, "header_row": hr,
                 "mapped": dict(zip(hstr, row)), "blanks": blanks,
                 "engine": ("AI 파싱" if (use_llm and self._llm_available()) else "규칙 기반")}
 
     def append_result(self, xlsx_path: str, description: str, output_path: str,
                       value_col: int = None, use_llm: bool = False,
                       chart_mode: str = "auto") -> Dict[str, Any]:
+        from src.excel.table_utils import detect_table
+        from openpyxl.utils import get_column_letter
         wb = openpyxl.load_workbook(xlsx_path)
         ws = self._sheet(wb)
-        headers = [c.value for c in ws[1]]
-        data_rows = ws.max_row - 1
+        hr, headers, _ = detect_table(ws)
+        data_rows = ws.max_row - hr
         row = self.parse(description, headers, next_round=data_rows + 1, use_llm=use_llm)
-        ws.append(row)
-        n_data = ws.max_row - 1
+        target = ws.max_row + 1                      # 빈 줄이 있어도 정확히 데이터 끝 다음에 기록
+        for ci, val in enumerate(row, start=1):
+            ws.cell(row=target, column=ci, value=val)
+        n_data = target - hr
+        anchor = get_column_letter(len(headers) + 2) + str(hr)
         if chart_mode == "all":
             vcols = self._numeric_value_cols(ws, headers) or [self._value_col_index(ws, headers)]
-            self._rebuild_chart(ws, n_data, value_cols=vcols)
+            self._rebuild_chart(ws, n_data, value_cols=vcols, header_row=hr, anchor=anchor)
             metric = ", ".join(str(headers[c - 1]) for c in vcols if 0 < c <= len(headers))
         else:
             vc = value_col or self._value_col_index(ws, headers)   # 하드코딩 대신 자동 감지
-            self._rebuild_chart(ws, n_data, value_col=vc)
+            self._rebuild_chart(ws, n_data, value_col=vc, header_row=hr, anchor=anchor)
             metric = str(headers[vc - 1]) if 0 < vc <= len(headers) else ""
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         wb.save(output_path)

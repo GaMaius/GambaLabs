@@ -26,13 +26,16 @@ class CellUpdate(BaseModel):
 
 
 def build_workbook_context(excel_path: str, max_items: int = 60) -> str:
-    """시트별 헤더·1열 항목 목록을 요약해 LLM 프롬프트용 문맥 문자열 생성."""
+    """시트별 헤더·1열 항목 목록을 요약해 LLM 프롬프트용 문맥 문자열 생성.
+    헤더가 1행이 아닌 시트도 자동 감지한다."""
+    from src.excel.table_utils import detect_table
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     lines: List[str] = []
     for ws in wb.worksheets:
-        headers = [str(c.value) for c in ws[1] if c.value is not None]
+        hr, header_vals, first_data = detect_table(ws)
+        headers = [str(v) for v in header_vals if v is not None]
         items: List[str] = []
-        for r in range(2, min(ws.max_row, max_items) + 1):
+        for r in range(first_data, min(ws.max_row, first_data + max_items - 1) + 1):
             v = ws.cell(row=r, column=1).value
             if v is not None and str(v).strip():
                 items.append(str(v))
@@ -116,6 +119,7 @@ class LLMExtractor:
     def _heuristic_fallback(self, text: str, excel_path: Optional[str]) -> List[Dict[str, Any]]:
         if not excel_path:
             return []
+        from src.excel.table_utils import detect_table
         wb = openpyxl.load_workbook(excel_path, data_only=True)
         updates: List[Dict[str, Any]] = []
 
@@ -124,10 +128,11 @@ class LLMExtractor:
         status_words = [w for w in ["지연", "완료", "진행중", "대기", "보류", "중단"] if w in text]
 
         for ws in wb.worksheets:
-            headers = [str(c.value) for c in ws[1] if c.value is not None]
+            _hr, header_vals, first_data = detect_table(ws)
+            headers = [str(v) for v in header_vals if v is not None]
             # 항목명 토큰이 요청문과 가장 많이 겹치는 행 1개 선택(자연어 축약 대응)
             best_score, best_item = 0, None
-            for r in range(2, ws.max_row + 1):
+            for r in range(first_data, ws.max_row + 1):
                 item = ws.cell(row=r, column=1).value
                 if not item:
                     continue
