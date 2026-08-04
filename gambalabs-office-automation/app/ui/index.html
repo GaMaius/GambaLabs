@@ -45,8 +45,8 @@
         </div>
 
         <!-- skill 기반 디자인 질문 입력 폼 (테마개발·PPT디자인·자동생성 공용) -->
-        <div id="designForm" class="qform">
-          <div class="qform-head">🎨 디자인 설정 <span>— 답할수록 결과가 의도에 가까워집니다. 채운 항목은 <b class="qdone-dot">●</b>로 표시돼요.</span></div>
+        <details id="designForm" class="qform" open>
+          <summary class="qform-head">🎨 디자인 설정 <span>— 답할수록 결과가 의도에 가까워집니다. 채운 항목은 <b class="qdone-dot">●</b>로 표시돼요.</span></summary>
           <details class="qitem" open ontoggle="markFilled()">
             <summary>🎯 목적 · 대상 · 톤 <span class="qbadge" id="b_purpose"></span></summary>
             <div class="qbody"><textarea id="qPurpose" oninput="markFilled()" placeholder="누구에게, 무엇을, 어떤 인상으로?&#10;예) 투자사 대상 WordSense 기술 소개. 신뢰감 있고 깔끔하게, 성능 수치를 강하게 강조"></textarea>
@@ -107,7 +107,7 @@
               <span class="qnote">md·txt·docx·csv는 내용까지 AI에 전달. pdf·이미지는 참고용.</span></div>
               <div class="reflist" id="refList"></div></div>
           </details>
-        </div>
+        </details>
 
         <div id="ppt-auto" class="hidden">
           <div class="card">
