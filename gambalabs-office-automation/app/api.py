@@ -554,16 +554,28 @@ class Api:
         except Exception as e:
             return {"error": str(e)}
 
-    def exp_log(self, xlsx_path, description, use_llm=False, chart_mode="auto"):
+    def exp_log(self, xlsx_path, description, use_llm=False, chart_mode="auto", in_place=False):
         if not xlsx_path or not os.path.exists(xlsx_path):
             return {"error": "트래커 엑셀을 선택하세요."}
         if not (description or "").strip():
             return {"error": "기록할 결과 설명을 입력하세요."}
         try:
             llm = bool(use_llm) and self._import_can_llm()
-            out = os.path.join(OUTPUT, _ts("experiment_logged", "xlsx"))
-            res = ExperimentLogger().append_result(xlsx_path, description, out, use_llm=llm,
+            if in_place:
+                # 선택한 파일에 직접 누적(원본에 계속 쌓기)
+                read_path = out = xlsx_path
+            else:
+                # 트래커별 '안정 파일명'으로 누적 — 매번 새 파일이 아니라 한 파일에 쌓인다.
+                base = os.path.splitext(os.path.basename(xlsx_path))[0]
+                if base.endswith("_log"):
+                    base = base[:-4]
+                out = os.path.join(OUTPUT, base + "_log.xlsx")
+                # 누적 로그가 이미 있으면 그걸 이어 쓴다(원본 재선택 시 누적 유실 방지)
+                read_path = out if (os.path.exists(out) and
+                                    os.path.abspath(out) != os.path.abspath(xlsx_path)) else xlsx_path
+            res = ExperimentLogger().append_result(read_path, description, out, use_llm=llm,
                                                     chart_mode=(chart_mode or "auto"))
+            res["in_place"] = bool(in_place)
             return res
         except Exception as e:
             return {"error": str(e)}

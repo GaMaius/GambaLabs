@@ -434,13 +434,14 @@ async function previewExp() {
 }
 async function logExp() {
   if (!EXP) return alert("트래커 엑셀을 선택하세요."); const llm = $("expLLM").checked; const cm = $("expChart").value;
+  const inPlace = $("expInPlace").checked;
   const box = $("expResult"); spin(box, llm ? "AI 파싱 후 기록 중…" : "기록 중…"); show(box); $("expGoBtn").disabled = true;
-  const r = await api().exp_log(EXP, $("expText").value, llm, cm); $("expGoBtn").disabled = false;
+  const r = await api().exp_log(EXP, $("expText").value, llm, cm, inPlace); $("expGoBtn").disabled = false;
   if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
   const rowHtml = Object.entries(r.appended).map(([k, v]) => `<div class="mono">• ${esc(k)}: ${esc(v === null || v === "" ? "—" : v)}</div>`).join("");
   const metric = r.chart_metric ? ` · 차트 지표: <b>${esc(r.chart_metric)}</b>` : "";
   EXP = r.out; setPath("expPath", r.out);   // 누적: 방금 기록한 파일을 다음 기록의 대상으로 자동 연결
-  show(box, `<span class="ok">✅ ${esc(r.sheet)}에 기록 (총 ${r.total_rows}행)</span> <span class="t">${esc(r.engine || "")}</span>${metric}${rowHtml}<span class="mono">${esc(r.out)}</span><div style="margin-top:6px"><span class="hint">다음 기록은 이 파일에 이어서 누적됩니다.</span> <button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
+  show(box, `<span class="ok">✅ ${esc(r.sheet)}에 기록 (총 ${r.total_rows}행)</span> <span class="t">${esc(r.engine || "")}</span>${metric}${rowHtml}<span class="mono">${esc(r.out)}</span><div style="margin-top:6px"><span class="hint">${r.in_place ? "선택한 파일에 직접 누적됩니다." : "이 로그 파일에 계속 누적됩니다(한 개)."}</span> <button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
 }
 
 /* ── 데이터: Excel→LLM 분석/요약 ── */
