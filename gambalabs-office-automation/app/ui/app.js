@@ -374,12 +374,29 @@ async function makeImport() {
 
 /* ── 데이터: 실험 기록 ── */
 async function pickExp() { const p = await api().pick_file("xlsx"); if (p) { EXP = p; setPath("expPath", p); } }
-async function logExp() {
-  if (!EXP) return alert("트래커 엑셀을 선택하세요."); const box = $("expResult"); spin(box); show(box);
-  const r = await api().exp_log(EXP, $("expText").value);
+function expRowTable(headers, mapped, blanks) {
+  const bset = new Set(blanks || []);
+  const th = headers.map((h) => `<th>${esc(h)}</th>`).join("");
+  const td = headers.map((h) => { const v = mapped[h]; const empty = bset.has(h) || v === "" || v == null; return `<td class="${empty ? "to" : ""}">${empty ? "—" : esc(v)}</td>`; }).join("");
+  return `<table class="chg"><tr>${th}</tr><tr>${td}</tr></table>`;
+}
+async function previewExp() {
+  if (!EXP) return alert("트래커 엑셀을 선택하세요.");
+  const llm = $("expLLM").checked; const box = $("expPreview");
+  spin(box, llm ? "AI가 해석 중… (로컬 모델이면 수 초~수십 초)" : "해석 중…"); show(box);
+  const r = await api().exp_log_preview(EXP, $("expText").value, llm);
   if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
-  const rowHtml = Object.entries(r.appended).map(([k, v]) => `<div class="mono">• ${esc(k)}: ${esc(v)}</div>`).join("");
-  show(box, `<span class="ok">✅ ${esc(r.sheet)}에 기록 (총 ${r.total_rows}행) · 차트 자동 갱신</span>${rowHtml}<span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
+  const warn = (r.blanks && r.blanks.length) ? `<div class="hint" style="margin-top:6px">빈 칸(설명에 근거 없음): ${r.blanks.map(esc).join(", ")}</div>` : "";
+  show(box, `<div class="pill">${esc(r.engine)} · ${esc(r.sheet)}</div>${expRowTable(r.headers, r.mapped, r.blanks)}${warn}`);
+}
+async function logExp() {
+  if (!EXP) return alert("트래커 엑셀을 선택하세요."); const llm = $("expLLM").checked;
+  const box = $("expResult"); spin(box, llm ? "AI 파싱 후 기록 중…" : "기록 중…"); show(box); $("expGoBtn").disabled = true;
+  const r = await api().exp_log(EXP, $("expText").value, llm); $("expGoBtn").disabled = false;
+  if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
+  const rowHtml = Object.entries(r.appended).map(([k, v]) => `<div class="mono">• ${esc(k)}: ${esc(v === null || v === "" ? "—" : v)}</div>`).join("");
+  const metric = r.chart_metric ? ` · 차트 지표: <b>${esc(r.chart_metric)}</b>` : "";
+  show(box, `<span class="ok">✅ ${esc(r.sheet)}에 기록 (총 ${r.total_rows}행)</span> <span class="t">${esc(r.engine || "")}</span>${metric}${rowHtml}<span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
 }
 
 /* ── 데이터: Excel→LLM 분석/요약 ── */

@@ -203,10 +203,18 @@
             </div>
             <div class="hint">결과를 자연어로 적으면 한 줄로 기록하고 추이 차트를 자동 갱신합니다.</div>
             <textarea id="expText" placeholder="예) 4회차 정확도 92.3%, SNR -20dB, 오인식 1건, 노이즈 강인성 개선"></textarea>
+            <label class="toggle"><input type="checkbox" id="expLLM"> <span><b>AI 파싱 (Ollama)</b> — 조사·표현이 자유로워도 컬럼에 맞게
+                해석해 기록. 끄면 규칙 기반(즉시). <span class="warn">켜면 로컬 모델이라 수 초~수십 초</span></span></label>
           </div>
           <div class="card">
-            <h3><span class="step-no">2</span> 기록 &amp; 차트 갱신</h3>
-            <div class="row"><button class="btn btn-primary" onclick="logExp()">기록 + 자동 차트</button></div>
+            <h3><span class="step-no">2</span> 기록 미리보기 <span style="flex:1"></span><button class="btn btn-ghost"
+                onclick="previewExp()">미리보기</button></h3>
+            <div class="hint">저장 전에 어떤 한 줄로 들어갈지 확인하세요. 빈 칸은 설명에 근거가 없던 컬럼입니다.</div>
+            <div id="expPreview" class="result hidden"></div>
+          </div>
+          <div class="card">
+            <h3><span class="step-no">3</span> 기록 &amp; 차트 갱신</h3>
+            <div class="row"><button class="btn btn-primary" id="expGoBtn" onclick="logExp()">기록 + 자동 차트</button></div>
             <div id="expResult" class="result hidden"></div>
           </div>
         </div>

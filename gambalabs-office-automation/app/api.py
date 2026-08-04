@@ -455,14 +455,27 @@ class Api:
             return {"error": str(e)}
 
     # ── 데이터: 실험/재무 기록 + 자동 차트 ────────────
-    def exp_log(self, xlsx_path, description):
+    def exp_log_preview(self, xlsx_path, description, use_llm=False):
+        """저장 전에, 자연어 설명이 어떤 한 행으로 기록될지 미리보기."""
         if not xlsx_path or not os.path.exists(xlsx_path):
             return {"error": "트래커 엑셀을 선택하세요."}
         if not (description or "").strip():
             return {"error": "기록할 결과 설명을 입력하세요."}
         try:
+            llm = bool(use_llm) and self._import_can_llm()
+            return ExperimentLogger().preview_result(xlsx_path, description, use_llm=llm)
+        except Exception as e:
+            return {"error": str(e)}
+
+    def exp_log(self, xlsx_path, description, use_llm=False):
+        if not xlsx_path or not os.path.exists(xlsx_path):
+            return {"error": "트래커 엑셀을 선택하세요."}
+        if not (description or "").strip():
+            return {"error": "기록할 결과 설명을 입력하세요."}
+        try:
+            llm = bool(use_llm) and self._import_can_llm()
             out = os.path.join(OUTPUT, _ts("experiment_logged", "xlsx"))
-            res = ExperimentLogger().append_result(xlsx_path, description, out)
+            res = ExperimentLogger().append_result(xlsx_path, description, out, use_llm=llm)
             return res
         except Exception as e:
             return {"error": str(e)}
