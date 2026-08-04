@@ -54,6 +54,7 @@ class Api:
         self._vec_cancelled = False
         self._form_theme = None      # 디자인 설정 폼에서 만든 임시 테마
         self._float_window = None     # 플로팅 편집기 창
+        self._brief = None            # 디자인 브리프(목적·자유 디렉션·참고자료) — 생성에 주입
 
     # ── 파일 다이얼로그 ─────────────────────────────
     def pick_file(self, kind="doc"):
@@ -121,6 +122,25 @@ class Api:
             self.theme = name
         return {"current": self.theme}
 
+    def theme_colors(self, theme_id):
+        """폼 '기반 테마' 시드용: 테마의 배경/강조/글자 색을 반환."""
+        _BUILTIN = {
+            "gamba": {"bg": "ECECEC", "accent": "0038A3", "ink": "123979"},
+            "light": {"bg": "F4F6FA", "accent": "0038A3", "ink": "123979"},
+            "none":  {"bg": "FFFFFF", "accent": "2456C7", "ink": "222222"},
+        }
+        if theme_id in _BUILTIN:
+            return _BUILTIN[theme_id]
+        try:
+            cfg = thememgr.resolve(theme_id)
+            if cfg and isinstance(cfg.get("C"), dict):
+                C = cfg["C"]
+                return {"bg": C.get("body", "FFFFFF"), "accent": C.get("brand", "2456C7"),
+                        "ink": C.get("hero", "1A1A1A")}
+        except Exception:
+            pass
+        return {}
+
     def _theme_config(self):
         """현재 테마가 폼(__form)이면 임시 설정, 커스텀이면 전체 설정, 내장이면 None."""
         if self.theme == "__form" and self._form_theme:
@@ -130,14 +150,114 @@ class Api:
         except Exception:
             return None
 
-    def set_form_theme(self, bg, accent, ink, band_fill=True, font="맑은 고딕"):
-        """디자인 설정 폼 값으로 '임시 테마'를 만들어 현재 적용(저장 안 함)."""
+    def set_form_theme(self, bg, accent, ink, band_fill=True, font="맑은 고딕", gradient=False):
+        """디자인 설정 폼 값으로 '임시 테마'를 만들어 현재 적용(저장 안 함).
+        gradient=True면 배경 그라데이션 PNG를 만들어 themeConfig.gradientBg로 첨부(render_deck.js가 콘텐츠 슬라이드 배경에 사용)."""
         try:
-            self._form_theme = thememgr.build_config("디자인 설정", bg, accent, ink, bool(band_fill), font, font)
+            cfg = thememgr.build_config("디자인 설정", bg, accent, ink, bool(band_fill), font, font)
+            if gradient:
+                try:
+                    from app.ppt import gradient as _grad
+                    from app.ppt import thememgr as _tm
+                    bg_hex = _tm._norm_hex(bg, "FFFFFF")
+                    # 배경색 → 강조 쪽으로 12% 섞은 색으로 은은한 그라데이션(밝으면 살짝 어둡게, 어두우면 살짝 밝게)
+                    c2 = _tm._mix(bg_hex, _tm._rgb(accent), 0.14)
+                    cfg["gradientBg"] = _grad.gradient_png("#" + bg_hex, "#" + c2, direction="v")
+                except Exception as e:
+                    print("[set_form_theme] gradient 생성 실패:", e)
+            self._form_theme = cfg
             self.theme = "__form"
             return {"ok": True}
         except Exception as e:
             return {"error": str(e)}
+
+    # ── 디자인 브리프(목적·자유 디렉션·참고자료) ─────────
+    def set_design_brief(self, purpose="", direction="", refs=None):
+        """폼의 자유 입력(목적·추가 디렉션)과 참고자료 경로 목록을 저장. 생성 시 LLM 프롬프트에 주입된다."""
+        if isinstance(refs, str):
+            refs = [refs]
+        refs = [r for r in (refs or []) if r and os.path.exists(r)]
+        self._brief = {"purpose": (purpose or "").strip(),
+                       "direction": (direction or "").strip(),
+                       "refs": refs}
+        return {"ok": True, "refs": len(refs)}
+
+    def _load_ref_text(self, path, limit=1500):
+        """참고자료 파일에서 텍스트를 추출(md/txt/docx). 실패·이미지 등은 파일명만."""
+        ext = os.path.splitext(path)[1].lower()
+        try:
+            if ext in (".md", ".txt", ".csv"):
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    return f.read()[:limit]
+            if ext == ".docx":
+                from docx import Document  # python-docx
+                d = Document(path)
+                return "\n".join(p.text for p in d.paragraphs if p.text.strip())[:limit]
+        except Exception:
+            pass
+        return ""
+
+    def _brief_text(self):
+        """저장된 브리프를 LLM 프롬프트용 문자열로 조립(없으면 빈 문자열)."""
+        b = self._brief
+        if not b:
+            return ""
+        parts = []
+        if b.get("purpose"):
+            parts.append(f"[발표 목적·톤]\n{b['purpose']}")
+        if b.get("direction"):
+            parts.append(f"[제작자 추가 디렉션 — 최대한 반영]\n{b['direction']}")
+        for i, r in enumerate(b.get("refs") or [], 1):
+            txt = self._load_ref_text(r)
+            name = os.path.basename(r)
+            if txt:
+                parts.append(f"[참고자료 {i}: {name}]\n{txt}")
+            else:
+                parts.append(f"[참고자료 {i}: {name}] (내용 텍스트 없음 — 디자인 참고용 파일)")
+        return "\n\n".join(parts).strip()
+
+    def extract_palette(self, image_path=None, n=6):
+        """참고 이미지에서 대표색을 추출(Pillow 양자화). 강조/배경/글자 추천색도 함께 반환.
+        image_path 없으면 파일 선택 다이얼로그를 띄운다."""
+        try:
+            if not image_path:
+                image_path = self.pick_file("image")
+            if not image_path or not os.path.exists(image_path):
+                return {"cancelled": True}
+            from PIL import Image
+            im = Image.open(image_path)
+            im.load()
+            im = im.convert("RGB")
+            im.thumbnail((240, 240))
+            try:
+                nn = max(2, min(int(n), 8))
+            except Exception:
+                nn = 6
+            q = im.quantize(colors=nn, method=Image.MEDIANCUT)
+            pal = q.getpalette()
+            counts = sorted(q.getcolors() or [], reverse=True)   # (빈도, 팔레트 index)
+            colors = []
+            for _cnt, idx in counts:
+                r, g, b = pal[idx * 3:idx * 3 + 3]
+                colors.append("%02X%02X%02X" % (r, g, b))
+            if not colors:
+                return {"error": "색을 추출하지 못했습니다."}
+
+            def _lum(h):
+                r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+                return 0.299 * r + 0.587 * g + 0.114 * b
+
+            def _sat(h):
+                r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+                mx, mn = max(r, g, b), min(r, g, b)
+                return 0 if mx == 0 else (mx - mn) / mx
+            bg = max(colors, key=_lum)                    # 가장 밝은 색 → 배경
+            ink = min(colors, key=_lum)                   # 가장 어두운 색 → 글자
+            accent = max(colors, key=lambda h: _sat(h) * (0.5 + _lum(h) / 510))  # 선명한 색 → 강조
+            return {"colors": colors, "accent": accent, "bg": bg, "ink": ink,
+                    "file": os.path.basename(image_path)}
+        except Exception as e:
+            return {"error": f"색 추출 실패({type(e).__name__}): {e}"}
 
     def open_float(self):
         """항상 위에 뜨는 작은 메모/편집 창을 연다(플로팅 편집기)."""
@@ -194,7 +314,7 @@ class Api:
             return {"error": "문서를 선택하세요."}
         try:
             llm = bool(use_llm) and self._import_can_llm()
-            plan = ppt_plan_full(doc_path, use_llm=llm)
+            plan = ppt_plan_full(doc_path, use_llm=llm, brief=self._brief_text())
             engine = f"AI 구조화 · {os.getenv('OPENAI_MODEL', 'LLM')}" if llm else "규칙 기반 (즉시)"
             return {"title": plan.get("title"), "subtitle": plan.get("subtitle"), "engine": engine,
                     "outline": [{"title": s.get("title", ""), "type": s.get("type", "")} for s in plan.get("slides", [])]}
@@ -205,7 +325,8 @@ class Api:
         try:
             llm = bool(use_llm) and self._import_can_llm()
             out = os.path.join(OUTPUT, _ts("deck_auto", "pptx"))
-            ppt_generate_full(doc_path, out, theme=self.theme, use_llm=llm, theme_config=self._theme_config())
+            ppt_generate_full(doc_path, out, theme=self.theme, use_llm=llm,
+                              theme_config=self._theme_config(), brief=self._brief_text())
             engine = f"AI 구조화 · {os.getenv('OPENAI_MODEL', 'LLM')}" if llm else "규칙 기반"
             return {"out": out, "engine": engine}
         except Exception as e:
@@ -276,7 +397,7 @@ class Api:
             return {"error": "파워포인트 파일을 선택하세요."}
         try:
             llm = bool(use_llm) and self._import_can_llm()
-            plan = pptx_import.build_plan(pptx_path, use_llm=llm)
+            plan = pptx_import.build_plan(pptx_path, use_llm=llm, brief=self._brief_text())
             out = []
             for s in plan.get("slides", []):
                 extras = []
@@ -295,7 +416,7 @@ class Api:
             return {"error": "파워포인트 파일을 선택하세요."}
         try:
             llm = bool(use_llm) and self._import_can_llm()
-            plan = pptx_import.build_plan(pptx_path, use_llm=llm)
+            plan = pptx_import.build_plan(pptx_path, use_llm=llm, brief=self._brief_text())
             out = os.path.join(OUTPUT, _ts("deck_from_ppt", "pptx"))
             render_plan(plan, out, image_fetch=image_search.fetch_image, theme=self.theme, theme_config=self._theme_config())
             engine = f"AI 해석 · {os.getenv('OPENAI_MODEL', 'LLM')}" if llm else "규칙 기반"

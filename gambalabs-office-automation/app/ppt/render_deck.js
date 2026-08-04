@@ -336,9 +336,10 @@ function imageBlock(s, image, x, y, w, h) {
 function contentSlide(sl) {
   const s = prs.addSlide();
   bandHeader(s, sl.title);
-  // 그라데이션 배경(지시로 생성된 PNG) — 밴드 아래 콘텐츠 영역에 깔기
-  if (sl.gradientPath)
-    s.addImage({ path: sl.gradientPath, x: 0, y: 1.05, w: W, h: 6.45, sizing: { type: "cover", w: W, h: 6.45 } });
+  // 그라데이션 배경 — 슬라이드별 지시(gradientPath) 우선, 없으면 테마 폼의 전역 그라데이션(T.gradientBg)
+  const gp = sl.gradientPath || T.gradientBg;
+  if (gp)
+    s.addImage({ path: gp, x: 0, y: 1.05, w: W, h: 6.45, sizing: { type: "cover", w: W, h: 6.45 } });
   const top = lead(s, sl.lead);
   // 유효성 가드: 데이터 없는 차트/설명 없는 이미지는 무시(렌더 크래시 방지)
   const c = sl.chart;

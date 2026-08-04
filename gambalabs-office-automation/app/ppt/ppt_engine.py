@@ -118,7 +118,16 @@ PLAN_SCHEMA = ('PLAN JSON: {"title","subtitle","slides":[{"type":"text|cards|tab
                '"title","lead","bullets":["..."],"items":["..."],"rows":[["헤더..","..."]]}]}')
 
 
-def interpret_llm(raw_text: str, title_hint: str = "", strict: bool = True) -> dict:
+def _brief_block(brief: str) -> str:
+    """디자인 브리프(목적·자유 디렉션·참고자료)를 프롬프트 상단 지시로 변환."""
+    b = (brief or "").strip()
+    if not b:
+        return ""
+    return ("\n[제작자 브리프 — 아래 목적·디렉션·참고자료를 슬라이드 구성·강조·문구에 최대한 반영하라. "
+            "참고자료는 사실 근거로만 쓰고 그대로 복붙하지 마라.]\n" + b[:2500] + "\n")
+
+
+def interpret_llm(raw_text: str, title_hint: str = "", strict: bool = True, brief: str = "") -> dict:
     """문서를 LLM(로컬 Ollama/GPT)이 읽고 슬라이드 구조로 나눈다. 색·디자인은 넣지 않음."""
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "ollama", base_url=os.getenv("OPENAI_BASE_URL"))
@@ -133,7 +142,7 @@ def interpret_llm(raw_text: str, title_hint: str = "", strict: bool = True) -> d
 - 표지·목차·마무리는 만들지 마라(렌더러가 자동 생성한다).
 - 색/폰트/테마는 절대 넣지 마라. 설명 없이 오직 JSON만 출력.
 {PLAN_SCHEMA}
-
+{_brief_block(brief)}
 [문서]
 {doc}"""
     resp = client.chat.completions.create(
@@ -180,7 +189,7 @@ def _normalize_llm(plan: dict, title_hint: str = "", strict: bool = True) -> dic
     return plan
 
 
-def build_plan(doc_path: str, use_llm: bool = False) -> dict:
+def build_plan(doc_path: str, use_llm: bool = False, brief: str = "") -> dict:
     """기본은 규칙 기반(즉시·안정). use_llm=True면 LLM이 문서를 구조화(로컬이면 느림), 실패 시 규칙으로 폴백."""
     if use_llm and (os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_BASE_URL")):
         from app.ppt import design_policy
@@ -188,15 +197,15 @@ def build_plan(doc_path: str, use_llm: bool = False) -> dict:
             with open(doc_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw = f.read()
             title_hint = os.path.splitext(os.path.basename(doc_path))[0]
-            return interpret_llm(raw, title_hint, strict=design_policy.is_strict())
+            return interpret_llm(raw, title_hint, strict=design_policy.is_strict(), brief=brief)
         except Exception as e:
             print(f"[ppt_engine] LLM 구조화 실패({e}) → 규칙 기반")
     return build_plan_rules(doc_path)
 
 
 def generate(doc_path: str, out_pptx: str, assets_dir: str = DEFAULT_ASSETS, theme: str = None,
-             use_llm: bool = False, theme_config: dict = None) -> str:
-    plan = build_plan(doc_path, use_llm=use_llm)
+             use_llm: bool = False, theme_config: dict = None, brief: str = "") -> str:
+    plan = build_plan(doc_path, use_llm=use_llm, brief=brief)
     if theme:
         plan["theme"] = theme
     if theme_config:

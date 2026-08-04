@@ -33,8 +33,9 @@ document.querySelectorAll(".nav button").forEach((b) => {
 /* 모드 토글 */
 function pptMode(m) {
   document.querySelectorAll('#tab-ppt .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
-  ["theme", "import", "auto", "float"].forEach((k) => $("ppt-" + k).classList.toggle("hidden", k !== m));
-  $("designForm").classList.toggle("hidden", m === "float");  // 디자인 설정: 플로팅 편집기 제외 노출
+  ["theme", "import", "auto"].forEach((k) => $("ppt-" + k).classList.toggle("hidden", k !== m));
+  $("ppt-float").classList.add("hidden");  // 플로팅 편집기: 현재 숨김(코드 보존)
+  $("designForm").classList.remove("hidden");  // 디자인 설정: 3모드 공통 노출
 }
 function dataMode(m) {
   document.querySelectorAll('#tab-data .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
@@ -59,6 +60,7 @@ function refreshThemes(th) {
   const ts = $("themeSel"); ts.innerHTML = "";
   THEME_OPTS.forEach((t) => { const o = document.createElement("option"); o.value = t.id; o.textContent = t.label + (t.custom ? " (커스텀)" : ""); o.title = t.desc || ""; if (t.id === th.current) o.selected = true; ts.appendChild(o); });
   updateThemeDel();
+  refreshSeedThemes();
 }
 function updateThemeDel() {
   const cur = THEME_OPTS.find((t) => t.id === $("themeSel").value);
@@ -114,29 +116,97 @@ async function deleteCurrentTheme() {
 }
 
 /* ── skill 기반 디자인 설정 폼 ── */
-let REF = "";
+let REFS = [];        // 참고자료 경로 목록(여러 개)
+let PALETTE = null;   // 최근 추출한 팔레트 {colors,accent,bg,ink}
 function qPick(group, btn) {
   const box = $(group);
   box.querySelectorAll(".qchip").forEach((c) => c.classList.remove("on"));
   btn.classList.add("on");
   box.dataset.val = btn.dataset.v;
 }
-async function pickRef() { const p = await api().pick_file("doc"); if (p) { REF = p; setPath("refPath", p); } }
+/* 참고자료: 여러 개 추가/삭제 */
+async function addRef() {
+  const p = await api().pick_file("doc");
+  if (p && !REFS.includes(p)) { REFS.push(p); renderRefs(); markFilled(); }
+}
+function removeRef(i) { REFS.splice(i, 1); renderRefs(); markFilled(); }
+function renderRefs() {
+  const box = $("refList");
+  if (!REFS.length) { box.innerHTML = `<div class="qnote">추가된 참고자료 없음</div>`; return; }
+  box.innerHTML = REFS.map((p, i) => {
+    const name = p.split(/[\\/]/).pop();
+    return `<span class="refchip" title="${esc(p)}">📄 ${esc(name)}<button onclick="removeRef(${i})">✕</button></span>`;
+  }).join("");
+}
+/* 컬러 스와치 미리보기 갱신 */
+function refreshSwatches() {
+  $("swAccent").style.background = $("qAccent").value;
+  $("swInk").style.background = $("qInk").value;
+}
+/* 채운 항목 배지(●) 표시 */
+function markFilled() {
+  refreshSwatches();
+  const set = (id, on) => { const e = $(id); if (e) e.textContent = on ? "●" : ""; };
+  set("b_purpose", $("qPurpose").value.trim());
+  set("b_direction", $("qDirection").value.trim());
+  set("b_ratio", $("qRatio").dataset.val !== "16:9");
+  set("b_color", $("qAccent").value.toLowerCase() !== "#0038a3" || $("qInk").value.toLowerCase() !== "#1a1a1a" || $("qBgTone").dataset.val !== "light" || $("qSeedTheme").value);
+  set("b_bg", $("qBg").dataset.val !== "solid");
+  set("b_font", $("qFont").dataset.val !== "맑은 고딕");
+  set("b_refs", REFS.length);
+}
+/* 기반 테마 → 폼 색 시드 */
+async function seedFromTheme() {
+  const id = $("qSeedTheme").value; if (!id) return;
+  try {
+    const c = await api().theme_colors(id);
+    if (c && c.accent) $("qAccent").value = "#" + c.accent;
+    if (c && c.ink) $("qInk").value = "#" + c.ink;
+    if (c && c.bg) { const dark = parseInt(c.bg.slice(0, 2), 16) * 0.299 + parseInt(c.bg.slice(2, 4), 16) * 0.587 + parseInt(c.bg.slice(4, 6), 16) * 0.114 < 140; setChip("qBgTone", dark ? "dark" : "light"); }
+    markFilled();
+  } catch (e) {}
+}
+function setChip(group, v) {
+  const box = $(group); box.dataset.val = v;
+  box.querySelectorAll(".qchip").forEach((c) => c.classList.toggle("on", c.dataset.v === v));
+}
+/* 참고 이미지에서 색 추출 */
+async function pickPalette() {
+  $("palFile").textContent = "추출 중…";
+  try {
+    const r = await api().extract_palette();
+    if (r.cancelled) { $("palFile").textContent = ""; return; }
+    if (r.error) { $("palFile").textContent = r.error; return; }
+    PALETTE = r; $("palFile").textContent = r.file ? `“${r.file}” 에서` : "";
+    show($("palRow"), r.colors.map((h) => `<button class="palsw" style="background:#${h}" title="#${h} → 강조색" onclick="useSwatch('${h}')"></button>`).join(""));
+    $("palCta").classList.remove("hidden");
+  } catch (e) { $("palFile").textContent = String(e.message || e); }
+}
+function useSwatch(h) { $("qAccent").value = "#" + h; markFilled(); }
+function applyAutoPalette() {
+  if (!PALETTE) return;
+  if (PALETTE.accent) $("qAccent").value = "#" + PALETTE.accent;
+  if (PALETTE.ink) $("qInk").value = "#" + PALETTE.ink;
+  if (PALETTE.bg) { const b = PALETTE.bg; const dark = parseInt(b.slice(0, 2), 16) * 0.299 + parseInt(b.slice(2, 4), 16) * 0.587 + parseInt(b.slice(4, 6), 16) * 0.114 < 140; setChip("qBgTone", dark ? "dark" : "light"); }
+  markFilled();
+}
 function readDesignForm() {
   const bgTone = $("qBgTone").dataset.val;
   const bg = bgTone === "dark" ? "141a2b" : "f6f8fc";   // 배경 톤 → 배경색
   const font = $("qFont").dataset.val === "__custom" ? ($("qFontCustom").value.trim() || "맑은 고딕") : $("qFont").dataset.val;
   return {
     purpose: $("qPurpose").value.trim(),
+    direction: $("qDirection").value.trim(),
     ratio: $("qRatio").dataset.val,
     bg, accent: $("qAccent").value.replace("#", ""), ink: $("qInk").value.replace("#", ""),
-    band_fill: $("qBg").dataset.val === "solid", gradient: $("qBg").dataset.val === "gradient",
-    font, ref: REF || "",
+    band_fill: true, gradient: $("qBg").dataset.val === "gradient",
+    font, refs: REFS.slice(),
   };
 }
 async function applyFormTheme() {
   const f = readDesignForm();
-  try { await api().set_form_theme(f.bg, f.accent, f.ink, f.band_fill, f.font); } catch (e) {}
+  try { await api().set_form_theme(f.bg, f.accent, f.ink, f.band_fill, f.font, f.gradient); } catch (e) {}
+  try { await api().set_design_brief(f.purpose, f.direction, f.refs); } catch (e) {}
   return f;
 }
 async function makeThemeFromForm() {
@@ -146,13 +216,22 @@ async function makeThemeFromForm() {
     const r = await api().add_theme_build(name, f.bg, f.accent, f.ink, f.band_fill, f.font);
     if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
     refreshThemes({ options: r.options, current: r.current });
+    refreshSeedThemes();
     show(box, `<span class="ok">✅ '${esc(r.added.label)}' 테마 생성·적용됨</span> — 🎨 목록에서 선택되고, PPT 디자인/자동 생성에도 쓰입니다.`);
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
 }
+/* 기반 테마 셀렉트 채우기(폼 내부) */
+function refreshSeedThemes() {
+  const sel = $("qSeedTheme"); if (!sel) return;
+  const keep = sel.value;
+  sel.innerHTML = `<option value="">직접 지정</option>`;
+  (THEME_OPTS || []).forEach((t) => { const o = document.createElement("option"); o.value = t.id; o.textContent = t.label + (t.custom ? " (커스텀)" : ""); sel.appendChild(o); });
+  sel.value = keep;
+}
 
-/* ── 플로팅 편집기 ── */
+/* ── 플로팅 편집기(현재 UI 숨김, 코드 보존) ── */
 async function openFloat() {
-  const box = $("floatResult"); show(box, `<span class="spin"></span>여는 중…`);
+  const box = $("floatResult"); if (!box) return; show(box, `<span class="spin"></span>여는 중…`);
   try {
     const r = await api().open_float();
     show(box, r && r.error ? `<span class="err">${esc(r.error)}</span>` : `<span class="ok">✅ 플로팅 창을 열었어요.</span> 화면 위에 항상 떠 있어요(닫기 전까지).`);
@@ -169,6 +248,7 @@ function helpDontShow() { localStorage.setItem("helpHide", $("helpDontShow").che
   if (!hide) openHelp();   // 처음 쓰는 사람에게 자동 노출(체크 시 중단)
 })();
 window.addEventListener("pywebviewready", initStatus);
+renderRefs(); markFilled();   // 폼 초기 상태(참고자료 목록·배지·스와치)
 
 /* ── PPT 풀 자동 ── */
 async function pickPpt() { const p = await api().pick_file("doc"); if (p) { PPT = p; setPath("pptPath", p); } }

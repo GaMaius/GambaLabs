@@ -179,6 +179,21 @@ table.chg td .to{color:var(--green);font-weight:600}
 .qrow>span{width:56px;flex:0 0 56px;color:var(--ink-muted);font-weight:600}
 .qrow input[type=color]{width:52px;height:30px;border:1px solid var(--hairline);border-radius:var(--r-sm);background:var(--canvas);cursor:pointer;padding:2px}
 .qnote{font-size:11.5px;color:var(--ink-faint);margin-top:6px}
+/* 디자인 폼 강화: 배지·스와치·팔레트·참고자료 */
+.qbadge{color:var(--primary);font-size:10px;line-height:1}
+.qdone-dot{color:var(--primary)}
+.qswbig{width:26px;height:20px;border-radius:var(--r-xs);border:1px solid var(--hairline);display:inline-block}
+.btn.sm{padding:4px 10px;font-size:12px}
+.palbox{margin-top:12px;padding-top:10px;border-top:1px dashed var(--hairline)}
+.palbox .qnote{display:inline-block;margin-left:8px}
+.palrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.palsw{width:34px;height:34px;border-radius:var(--r-sm);border:1px solid var(--hairline-strong);cursor:pointer;padding:0}
+.palsw:hover{transform:scale(1.08);box-shadow:var(--shadow-1)}
+.palcta{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.reflist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.refchip{display:inline-flex;align-items:center;gap:6px;background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-full);padding:5px 6px 5px 11px;font-size:12.5px;color:var(--ink-2);max-width:100%}
+.refchip button{background:var(--surface-2);border:none;color:var(--ink-muted);width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:11px;line-height:1;flex:0 0 18px}
+.refchip button:hover{background:var(--danger,#e5484d);color:#fff}
 .seg{display:inline-flex;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:3px;margin-bottom:var(--sp-md);gap:2px}
 .seg button{background:transparent;border:none;color:var(--ink-muted);font-family:var(--font);font-size:14px;font-weight:500;padding:7px 16px;border-radius:var(--r-sm);cursor:pointer}
 .seg button.on{background:var(--primary);color:#fff}

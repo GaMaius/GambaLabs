@@ -37,8 +37,7 @@
         <div class="toolbar">
           <div class="seg"><button class="on" data-m="theme" onclick="pptMode('theme')">테마 개발</button><button
               data-m="import" onclick="pptMode('import')">PPT 디자인</button><button data-m="auto"
-              onclick="pptMode('auto')">자동 생성 PPT</button><button data-m="float"
-              onclick="pptMode('float')">플로팅 편집기</button></div>
+              onclick="pptMode('auto')">자동 생성 PPT</button></div>
           <div class="themepick"><span class="themepick-label">🎨 디자인 테마</span><select id="themeSel" class="modelsel"
               onchange="onThemeChange()"></select><button class="iconbtn" onclick="openThemeModal()"
               title="테마 추가·제작">＋</button><button class="iconbtn danger hidden" id="themeDelBtn"
@@ -47,13 +46,19 @@
 
         <!-- skill 기반 디자인 질문 입력 폼 (테마개발·PPT디자인·자동생성 공용) -->
         <div id="designForm" class="qform">
-          <div class="qform-head">🎨 디자인 설정 <span>— pptx-making-guide 질문에 답하면 테마가 만들어집니다. 항목을 눌러 펼치세요.</span></div>
-          <details class="qitem" open>
-            <summary>🎯 목적 · 스타일</summary>
-            <div class="qbody"><textarea id="qPurpose" placeholder="예) 투자사 대상 WordSense 기술 소개. 신뢰감 있고 깔끔하게, 성능 강조"></textarea></div>
+          <div class="qform-head">🎨 디자인 설정 <span>— 답할수록 결과가 의도에 가까워집니다. 채운 항목은 <b class="qdone-dot">●</b>로 표시돼요.</span></div>
+          <details class="qitem" open ontoggle="markFilled()">
+            <summary>🎯 목적 · 대상 · 톤 <span class="qbadge" id="b_purpose"></span></summary>
+            <div class="qbody"><textarea id="qPurpose" oninput="markFilled()" placeholder="누구에게, 무엇을, 어떤 인상으로?&#10;예) 투자사 대상 WordSense 기술 소개. 신뢰감 있고 깔끔하게, 성능 수치를 강하게 강조"></textarea>
+              <div class="qnote">발표의 목적·청중·원하는 분위기를 적을수록 AI가 구성을 맞춥니다.</div></div>
           </details>
           <details class="qitem">
-            <summary>📐 비율</summary>
+            <summary>🖊 추가 디렉션 (자유 입력) <span class="qbadge" id="b_direction"></span></summary>
+            <div class="qbody"><textarea id="qDirection" oninput="markFilled()" placeholder="구성·강조·레이아웃을 자유롭게 지시하세요.&#10;예) 표지는 임팩트 있게 한 문장. 성능은 큰 숫자 지표 카드로. 배포 방식은 2열 비교+도넛. 마지막에 로드맵 타임라인. 문장은 짧게, 군더더기 빼고."></textarea>
+              <div class="qnote">여기 적은 지시는 AI 구조화(Ollama/GPT) 프롬프트에 <b>그대로</b> 전달됩니다. (규칙 기반 모드에선 무시)</div></div>
+          </details>
+          <details class="qitem">
+            <summary>📐 비율 <span class="qbadge" id="b_ratio"></span></summary>
             <div class="qbody"><div class="qchips" id="qRatio" data-val="16:9">
               <button class="qchip on" data-v="16:9" onclick="qPick('qRatio',this)">16:9 (기본)</button>
               <button class="qchip" data-v="4:3" onclick="qPick('qRatio',this)">4:3</button>
@@ -61,34 +66,46 @@
             </div><div class="qnote">현재 16:9 최적. 4:3·A4는 실험적.</div></div>
           </details>
           <details class="qitem">
-            <summary>🎨 컬러</summary>
+            <summary>🎨 컬러 &amp; 배색 <span class="qbadge" id="b_color"></span></summary>
             <div class="qbody">
+              <div class="qrow"><span>기반 테마</span><select id="qSeedTheme" class="modelsel" onchange="seedFromTheme()">
+                <option value="">직접 지정</option></select></div>
+              <div class="qnote" style="margin:2px 0 10px">저장된 테마를 고르면 아래 색이 그 테마 값으로 채워집니다(이후 수정 가능).</div>
               <div class="qrow"><span>배경 톤</span><div class="qchips" id="qBgTone" data-val="light">
-                <button class="qchip on" data-v="light" onclick="qPick('qBgTone',this)">밝게</button>
-                <button class="qchip" data-v="dark" onclick="qPick('qBgTone',this)">어둡게</button></div></div>
-              <div class="qrow"><span>강조색</span><input type="color" id="qAccent" value="#0038a3"></div>
-              <div class="qrow"><span>글자색</span><input type="color" id="qInk" value="#1a1a1a"></div>
+                <button class="qchip on" data-v="light" onclick="qPick('qBgTone',this);markFilled()">밝게</button>
+                <button class="qchip" data-v="dark" onclick="qPick('qBgTone',this);markFilled()">어둡게</button></div></div>
+              <div class="qrow"><span>강조색</span><input type="color" id="qAccent" value="#0038a3" oninput="markFilled()"><span class="qswbig" id="swAccent"></span></div>
+              <div class="qrow"><span>글자색</span><input type="color" id="qInk" value="#1a1a1a" oninput="markFilled()"><span class="qswbig" id="swInk"></span></div>
+              <div class="palbox">
+                <button class="btn btn-util" onclick="pickPalette()">🖼 참고 이미지에서 색 추출</button>
+                <span class="qnote" id="palFile"></span>
+                <div class="palrow hidden" id="palRow"></div>
+                <div class="palcta hidden" id="palCta">
+                  <span class="qnote">클릭: 강조색 지정 · </span>
+                  <button class="btn btn-ghost sm" onclick="applyAutoPalette()">자동 배색(강조·배경·글자)</button>
+                </div>
+              </div>
             </div>
           </details>
           <details class="qitem">
-            <summary>🖼 배경</summary>
+            <summary>🖼 배경 <span class="qbadge" id="b_bg"></span></summary>
             <div class="qbody"><div class="qchips" id="qBg" data-val="solid">
-              <button class="qchip on" data-v="solid" onclick="qPick('qBg',this)">단색</button>
-              <button class="qchip" data-v="gradient" onclick="qPick('qBg',this)">그라데이션</button>
-            </div></div>
+              <button class="qchip on" data-v="solid" onclick="qPick('qBg',this);markFilled()">단색</button>
+              <button class="qchip" data-v="gradient" onclick="qPick('qBg',this);markFilled()">그라데이션</button>
+            </div><div class="qnote">그라데이션: 콘텐츠 슬라이드 배경을 배경색→강조색으로 은은하게.</div></div>
           </details>
           <details class="qitem">
-            <summary>🔤 폰트</summary>
+            <summary>🔤 폰트 <span class="qbadge" id="b_font"></span></summary>
             <div class="qbody"><div class="qchips" id="qFont" data-val="맑은 고딕">
-              <button class="qchip on" data-v="맑은 고딕" onclick="qPick('qFont',this)">기본 (맑은 고딕)</button>
-              <button class="qchip" data-v="__custom" onclick="qPick('qFont',this);document.getElementById('qFontCustom').classList.toggle('hidden',this.dataset.v!=='__custom')">기타</button>
-            </div><input id="qFontCustom" class="hidden" placeholder="폰트 이름 (예: Pretendard)" style="margin-top:8px;width:100%"></div>
+              <button class="qchip on" data-v="맑은 고딕" onclick="qPick('qFont',this);markFilled()">기본 (맑은 고딕)</button>
+              <button class="qchip" data-v="__custom" onclick="qPick('qFont',this);document.getElementById('qFontCustom').classList.toggle('hidden',this.dataset.v!=='__custom');markFilled()">기타</button>
+            </div><input id="qFontCustom" class="hidden" oninput="markFilled()" placeholder="폰트 이름 (예: Pretendard)" style="margin-top:8px;width:100%"></div>
           </details>
           <details class="qitem">
-            <summary>📎 참고자료 (선택)</summary>
-            <div class="qbody"><div class="row"><button class="btn btn-util" onclick="pickRef()">파일 선택</button>
-              <div class="pathbox empty" id="refPath">선택된 참고자료 없음</div></div>
-              <div class="qnote">디자인·내용 참고용. (md·txt·docx·pdf·이미지)</div></div>
+            <summary>📎 참고자료 (여러 개) <span class="qbadge" id="b_refs"></span></summary>
+            <div class="qbody"><div class="row"><button class="btn btn-util" onclick="addRef()">＋ 파일 추가</button>
+              <span class="qnote">md·txt·docx·csv는 내용까지 AI에 전달. pdf·이미지는 참고용.</span></div>
+              <div class="reflist" id="refList"></div></div>
           </details>
         </div>
 
@@ -350,7 +367,7 @@
           <div class="hflow-title">📊 발표자료 만들기 — 3단계</div>
           <div class="hstep"><span class="hstep-n">1</span>
             <div><b>방식 고르기</b>
-              <div class="htags"><span>테마 개발</span><span>PPT 디자인</span><span>자동 생성 PPT</span><span>플로팅 편집기</span></div>
+              <div class="htags"><span>테마 개발</span><span>PPT 디자인</span><span>자동 생성 PPT</span></div>
               <div class="hstep-sub">PPT 디자인 = 러프 PPT에 내용·설명 적어 주기 · 자동 생성 = 문서만 넣기</div>
             </div>
           </div>

@@ -19,12 +19,16 @@ python -m app.main_app      # (프로젝트 루트에서)
   pywebview가 `window.native`(.NET) 그래프를 무한 재귀 훑어 UI 스레드가 멈춤("응답없음"). `api.py`/`main_app.py` 참고.
 
 ## 2. 앱 구조 — 3탭
-### 발표자료 (`app/ppt/`) — 4모드, 최종 렌더는 `render_deck.js`(pptxgenjs)
-- **풀 자동**: 문서(md/txt) → `ppt_engine.py` 파싱/LLM 구조화 → 덱. `AI 구조화(Ollama)` 토글.
-- **디자인 보조(스펙)**: `spec_engine.py` — `#제목/-불릿[강조]/[차트:..]/[이미지:..]` 문법. UI에서 기본 숨김(토글로 표시).
-- **AI 대화형**: `agent_chat.py` — GPT/Claude식 단일 채팅면(입력 하단 고정). 질문하며 샘플→전체.
-- **PPT 입력**: `pptx_import.py` — 러프 PPT의 텍스트·설명 읽어 해석. `AI 정밀 해석(Ollama)` 토글.
-- **🎨 디자인 테마**(4모드 공통): 내장 gamba/light/none + **커스텀 업로드/제작**(`thememgr.py`, `app/ppt/themes/*.json`).
+### 발표자료 (`app/ppt/`) — 최종 렌더는 `render_deck.js`(pptxgenjs)
+UI 모드(현재): **테마 개발 · PPT 디자인 · 자동 생성 PPT**(+플로팅 편집기는 숨김 처리, 코드 보존).
+- **자동 생성 PPT**(옛 '풀 자동'): 문서(md/txt) → `ppt_engine.py` 파싱/LLM 구조화 → 덱. `AI 구조화(Ollama)` 토글.
+- **PPT 디자인**(옛 'PPT 입력'): `pptx_import.py` — 러프 PPT의 텍스트·설명 읽어 레이아웃 설계. `AI 정밀 해석(Ollama)` 토글.
+- **테마 개발**: 디자인 폼 값으로 재사용 테마 저장(`thememgr.add_from_spec`).
+- (내부 보존, UI 비노출) `spec_engine.py`(스펙 문법), `agent_chat.py`(대화형). 재활성화 가능.
+- **🎨 디자인 테마**(공통): 내장 gamba/light/none + **커스텀 업로드/제작**(`thememgr.py`, `app/ppt/themes/*.json`).
+- **🎨 디자인 설정 폼**(`#designForm`, 3모드 공통): pptx-making-guide 질문을 항목형으로. 폼 값 → 임시 테마(`set_form_theme`) + **디자인 브리프**(`set_design_brief`: 목적·자유 디렉션·참고자료)로 생성에 주입.
+  - 폼→생성 연결 흐름: `applyFormTheme()`(색·폰트·그라데이션) + `applyDesignBrief()`(목적+디렉션+참고자료 텍스트) → `ppt_make_full`/`ppt_import_make`가 `brief`를 build_plan→interpret_llm 프롬프트에 넣음.
+  - 참고 이미지 색 추출: `api.extract_palette(image)`(Pillow 양자화) → 강조/배경/글자 추천.
 
 ### 데이터 & 차트 (`src/excel/`)
 - **실험/재무 기록 + 자동차트**: `experiment_logger.py`. 실험 스크립트에 `from gamba_log import log_result` 한 줄이면 트래커 누적+차트 갱신.
@@ -60,7 +64,14 @@ python -m app.main_app      # (프로젝트 루트에서)
 Python 3.11: pywebview 6.2.1, openai 2.x, openpyxl, pandas, python-pptx, Pillow(+heif/avif), reportlab, vtracer, requests, python-dotenv.
 Node: pptxgenjs, @resvg/resvg-js. 에셋: `ppt-skill/assets/`(로고·배경), 스킬 가이드 `ppt-skill/*.md`, `THEME_AUTHORING.md`.
 
-## 7. 백로그 (미완)
+## 7. 진행 중 — 디자인 입력 폼 강화 (IMPROVEMENTS.md 참고)
+"퀄리티·자유도·UI/UX" 목표로 폼을 개편 중. 착수 시점 스냅샷:
+- 진단: 폼이 색·폰트만 임시 테마로 쓰고 **목적·참고자료·비율·그라데이션은 수집만 하고 버려짐** → 생성 품질에 폼이 거의 영향 없음.
+- 착수 항목(체크리스트 IMPROVEMENTS.md "디자인 입력 폼 강화"): (1)플로팅 숨김 (2)참고자료 다중 (3)이미지 색 추출 (4)자유 디렉션 (5)폼→생성 brief 주입 (6)기반 테마 시드 (7)그라데이션 실적용 (8)UX 정돈.
+- 신규 API(구현/예정): `set_design_brief(purpose,direction,refs[])`, `extract_palette(image)`, `set_form_theme(...,gradient)`; 엔진 `interpret_llm(...,brief)`·`build_plan(...,brief)`·`generate(...,brief)`.
+
+## 8. 백로그 (미완)
 - 7b 설계 실수(1:1 매핑·오분류) 추가 완화 / 회사 GPT 연동 시 freeform 실검증
 - 팀장님 PDF 보고서에 경쟁툴+3b/7b 벤치마크 반영 / PyInstaller .exe 패키징 / Word(docx) 탭
 - 테마 업로드·제작 실제 앱 클릭 테스트(현재 DOM 검증만)
+- 플로팅 편집기: 현재 숨김. PPT 임베드 편집은 pywebview 한계로 보류.

@@ -83,7 +83,15 @@ _FREEFORM_RULES = """[설계 위임]
 너는 유능한 발표 디자이너다. 첫 [슬라이드 1]은 표지(title/subtitle)로, 나머지는 각 내용의 성격에 가장 맞는 레이아웃으로 자유롭게 설계하라. 수치는 metrics, 비교는 compare(+도넛), 병렬은 cards, 표는 table, 서술은 text/content를 골라 쓰고, 러프 입력을 풍부하게 확장하라. 디자인 지시 문구는 필드로만 반영하고 텍스트엔 넣지 마라. 이미지 query는 반드시 영어 키워드로. 없는 수치는 지어내지 마라(단 '임의로'라고 하면 허용)."""
 
 
-def interpret_llm(slides, mode: str = "template") -> Dict[str, Any]:
+def _brief_block(brief: str) -> str:
+    b = (brief or "").strip()
+    if not b:
+        return ""
+    return ("\n[제작자 브리프 — 목적·디렉션·참고자료를 레이아웃 선택·강조·문구에 최대한 반영하라. "
+            "참고자료는 근거로만 쓰고 복붙 금지.]\n" + b[:2500] + "\n")
+
+
+def interpret_llm(slides, mode: str = "template", brief: str = "") -> Dict[str, Any]:
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "ollama", base_url=os.getenv("OPENAI_BASE_URL"))
     rules = _TEMPLATE_RULES if mode == "template" else _FREEFORM_RULES
@@ -93,7 +101,7 @@ def interpret_llm(slides, mode: str = "template") -> Dict[str, Any]:
 
 {PLAN_SCHEMA}
 색/폰트/테마는 절대 넣지 마라(렌더러가 고정). 설명 없이 오직 JSON만 출력.
-
+{_brief_block(brief)}
 {_LLM_EXAMPLE}
 
 [변환할 파워포인트 내용]
@@ -288,14 +296,14 @@ def interpret_rules(slides) -> Dict[str, Any]:
     return plan
 
 
-def build_plan(pptx_path: str, use_llm: bool = False) -> Dict[str, Any]:
+def build_plan(pptx_path: str, use_llm: bool = False, brief: str = "") -> Dict[str, Any]:
     """기본은 규칙 기반(즉시·안정). use_llm=True면 LLM으로 자유서술 해석(로컬 CPU면 느림)."""
     slides = extract_slides(pptx_path)
     if use_llm and (os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_BASE_URL")):
         from app.ppt import design_policy
         mode = design_policy.design_mode()   # 강한 모델=freeform(위임), 약한/로컬=template(가드레일)
         try:
-            plan = interpret_llm(slides, mode=mode)
+            plan = interpret_llm(slides, mode=mode, brief=brief)
             if plan.get("slides"):          # 약한 모델이 빈 결과를 내면 폴백
                 return plan
             print("[pptx_import] LLM 빈 결과 → 규칙 기반 폴백")
