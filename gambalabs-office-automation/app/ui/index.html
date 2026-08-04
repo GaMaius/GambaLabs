@@ -15,9 +15,9 @@
       <div class="sub" style="padding:0 6px 16px;font-size:12px;color:var(--ink-muted);font-weight:600">Office AI 자동화
       </div>
       <nav class="nav">
-        <button data-tab="ppt" class="active"><span class="dot" style="background:var(--purple)"></span> 발표자료</button>
-        <button data-tab="data"><span class="dot" style="background:var(--teal)"></span> 데이터 &amp; 차트</button>
-        <button data-tab="vector"><span class="dot" style="background:var(--orange)"></span> 벡터 변환</button>
+        <button data-tab="ppt" class="active"><span class="dot" style="background:var(--purple)"></span> PPT</button>
+        <button data-tab="data"><span class="dot" style="background:var(--teal)"></span> Excel</button>
+        <button data-tab="vector"><span class="dot" style="background:var(--orange)"></span> SVG 변환</button>
       </nav>
       <div class="spacer"></div>
       <button class="btn btn-util" style="margin-bottom:10px;width:100%" onclick="openHelp()">❓ 사용 가이드</button>
@@ -31,7 +31,7 @@
       <!-- 발표자료 -->
       <section class="tab active" id="tab-ppt">
         <div class="head">
-          <h1>발표자료</h1>
+          <h1>PPT</h1>
           <p>제작자가 내용·구성을 정하면, 툴이 브랜드 디자인을 입힙니다.</p>
         </div>
         <div class="toolbar">
@@ -179,7 +179,7 @@
       <!-- 데이터 & 차트 -->
       <section class="tab" id="tab-data">
         <div class="head">
-          <h1>데이터 &amp; 차트</h1>
+          <h1>Excel</h1>
           <p>실험·재무 결과를 빠르게 기록하고, 수식·차트를 보존합니다.</p>
         </div>
         <div class="seg"><button class="on" data-m="exp" onclick="dataMode('exp')">실험/재무 기록 + 자동 차트</button><button
@@ -255,7 +255,7 @@
       <!-- 벡터 변환 -->
       <section class="tab" id="tab-vector">
         <div class="head">
-          <h1>비트맵 → 벡터</h1>
+          <h1>SVG 변환</h1>
           <p>로고·아이콘·이미지를 확대해도 안 깨지는 SVG 벡터로 변환합니다. (visioncortex vtracer, 로컬 처리)</p>
         </div>
         <div class="card">
