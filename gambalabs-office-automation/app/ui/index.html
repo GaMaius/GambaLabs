@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>감바랩스 오피스 AI</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 
 <body>
@@ -48,7 +50,7 @@
         <div id="ppt-modehelp" class="modehelp"></div>
 
         <!-- skill 기반 디자인 질문 입력 폼 (테마개발·PPT디자인·자동생성 공용) -->
-        <details id="designForm" class="qform" open>
+        <details id="designForm" class="qform">
           <summary class="qform-head">🎨 디자인 설정 <span>— 답할수록 결과가 의도에 가까워집니다. 채운 항목은 <b class="qdone-dot">●</b>로 표시돼요.</span></summary>
           <details class="qitem" open ontoggle="markFilled()">
             <summary>🎯 목적 · 대상 · 톤 <span class="qbadge" id="b_purpose"></span></summary>
@@ -102,7 +104,7 @@
             <div class="qbody"><div class="qchips" id="qFont" data-val="맑은 고딕">
               <button class="qchip on" data-v="맑은 고딕" onclick="qPick('qFont',this);markFilled()">기본 (맑은 고딕)</button>
               <button class="qchip" data-v="__custom" onclick="qPick('qFont',this);document.getElementById('qFontCustom').classList.toggle('hidden',this.dataset.v!=='__custom');markFilled()">기타</button>
-            </div><input id="qFontCustom" class="hidden" oninput="markFilled()" placeholder="폰트 이름 (예: Pretendard)" style="margin-top:8px;width:100%"></div>
+            </div><input id="qFontCustom" class="notion-input hidden" oninput="markFilled()" placeholder="폰트 이름 (예: Pretendard)" style="margin-top:8px;width:100%"></div>
           </details>
           <details class="qitem">
             <summary>📎 참고자료 (여러 개) <span class="qbadge" id="b_refs"></span></summary>
@@ -137,8 +139,8 @@
           <div class="card">
             <h3><span class="step-no">＊</span> 테마 만들기</h3>
             <div class="hint">위 <b>디자인 설정</b>으로 재사용 가능한 브랜드 테마를 만들어 저장합니다. 만든 테마는 오른쪽 위 🎨 목록에서 선택하거나 다른 발표에도 씁니다.</div>
-            <div class="row" style="margin-top:6px"><input id="themeName" placeholder="테마 이름 (예: 우리팀 블루)"
-                style="flex:1;min-width:200px"><button class="btn btn-primary" onclick="makeThemeFromForm()">이 설정으로 테마 만들기</button>
+            <div class="row" style="margin-top:12px"><input id="themeName" class="notion-input" placeholder="테마 이름 (예: 우리팀 블루)"
+                style="flex:1;min-width:200px"><button class="btn btn-primary" style="padding: 10px 16px; border-radius: 8px;" onclick="makeThemeFromForm()">이 설정으로 테마 만들기</button>
             </div>
             <div id="themeMakeResult" class="result hidden"></div>
           </div>
@@ -214,99 +216,71 @@
           <h1>Excel</h1>
           <p>실험·재무 결과를 빠르게 기록하고, 수식·차트를 보존합니다.</p>
         </div>
-        <div class="seg"><button class="on" data-m="exp" onclick="dataMode('exp')">실험/재무 기록 + 자동 차트</button><button
-            data-m="dash" onclick="dataMode('dash')">대시보드 수정</button><button data-m="analyze"
-            onclick="dataMode('analyze')">분석/요약</button></div>
+        <div class="seg"><button class="on" data-m="exp-code" onclick="dataMode('exp-code')">실험 기록 코드 삽입</button><button
+            data-m="exp-analyze" onclick="dataMode('exp-analyze')">엑셀 데이터 분석/차트 생성</button><button
+            data-m="receipt" onclick="dataMode('receipt')">자동 영수증 작성</button></div>
 
         <div id="data-modehelp" class="modehelp"></div>
 
-        <div id="data-exp">
+        <div id="data-exp-code">
           <div class="card" style="border-style:dashed">
             <h3>⚡ 실험 스크립트에 심기 (수동 입력 없이 자동 기록) <span style="flex:1"></span><button class="btn btn-util"
                 onclick="copySnippet()">📋 복사</button></h3>
-            <div class="hint">실험 코드 끝에 아래를 붙이면 실행할 때마다 결과가 트래커에 자동 누적 + 차트 갱신됩니다.
-              <span class="warn">gamba_log는 이 프로그램 폴더 안의 파일이라, 스크립트에서 쓰려면 경로 추가가 필요합니다(아래 첫 줄).</span></div>
-            <pre id="expSnippet" class="codebox">불러오는 중…</pre>
-            <div class="qnote">openpyxl이 설치된 파이썬에서 실행하세요. 트래커 파일 위치를 바꾸려면 <span class="mono">log_result(..., tracker="경로.xlsx")</span>.</div>
+            <div class="hint">실험 코드 끝에 아래를 붙이면 실행할 때마다 결과가 엑셀 파일(트래커)에 자동 누적됩니다.
+              <span class="warn">아래 코드를 복사해서 실험 스크립트에 붙여넣으세요.</span></div>
+            <div class="seg" style="margin-top:10px">
+              <button class="on" data-lang="python" onclick="setSnippetLang('python')">Python</button>
+              <button data-lang="c" onclick="setSnippetLang('c')">C/C++</button>
+            </div>
+            <pre style="margin-top:0; border-top-left-radius:0;"><code id="expSnippet" class="codebox hljs">불러오는 중…</code></pre>
+            <div class="qnote">트래커 파일 위치를 바꾸려면 경로 인자(<span class="mono">tracker="..."</span>)를 변경하세요.</div>
           </div>
+        </div>
+
+        <div id="data-exp-analyze" class="hidden">
           <div class="card">
-            <h3><span class="step-no">1</span> 트래커 &amp; 결과 <span
-                style="font-size:12px;color:var(--ink-muted);font-weight:400">(또는 여기에 직접 입력)</span></h3>
-            <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickExp()">트래커 엑셀</button>
+            <h3><span class="step-no">1</span> 분석할 트래커 (기록된 엑셀) <span
+                style="font-size:12px;color:var(--ink-muted);font-weight:400"></span></h3>
+            <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickExp()">트래커 엑셀 선택</button>
               <div class="pathbox empty" id="expPath">선택된 파일 없음</div>
             </div>
             <details class="qitem" style="border-top:1px solid var(--hairline)">
               <summary>＋ 새 트래커 만들기 (없으면)</summary>
               <div class="qbody">
                 <div class="hint">기록할 <b>컬럼(헤더)</b>을 쉼표로 구분해 적으세요. '회차'·'날짜'는 자동 채워집니다.</div>
-                <input id="tkHeaders" placeholder="회차, 날짜, 정확도(%), SNR(dB), 오인식(건), 비고" style="width:100%">
-                <div class="row" style="margin-top:8px"><input id="tkName" placeholder="파일/시트 이름 (예: 실험기록)" style="flex:1">
-                  <button class="btn btn-util" onclick="newTracker()">만들기 · 저장</button></div>
+                <input id="tkHeaders" class="notion-input" placeholder="회차, 날짜, 정확도(%), SNR(dB), 오인식(건), 비고" style="width:100%">
+                <div class="row" style="margin-top:8px"><input id="tkName" class="notion-input" placeholder="파일/시트 이름 (예: 실험기록)" style="flex:1">
+                  <button class="btn btn-util" style="padding:10px 16px; border-radius:8px" onclick="newTracker()">만들기 · 저장</button></div>
                 <div id="tkResult" class="result hidden"></div>
               </div>
             </details>
-            <div class="hint" style="margin-top:10px">결과를 자연어로 적으면 한 줄로 기록하고 추이 차트를 자동 갱신합니다.</div>
-            <textarea id="expText" placeholder="예) 4회차 정확도 92.3%, SNR -20dB, 오인식 1건, 노이즈 강인성 개선"></textarea>
-            <div class="hint">AI(Ollama)가 문장을 트래커 컬럼에 맞게 해석해 한 줄로 기록합니다. <span class="warn">로컬 모델이라 수 초~수십 초</span></div>
-            <div class="optrow" style="margin-top:10px">
-              <label>차트 지표<select id="expChart" class="modelsel">
-                  <option value="auto">단일 지표 (자동 선택)</option>
-                  <option value="all">모든 수치 지표</option>
-                </select></label>
-            </div>
-            <label class="chk" style="margin-top:8px"><input type="checkbox" id="expInPlace"> <span><b>제자리 누적</b> — 선택한
-                파일에 직접 쌓기. 끄면 <span class="mono">output</span>에 트래커별 로그 파일(한 개)로 누적됩니다.</span></label>
           </div>
           <div class="card">
-            <h3><span class="step-no">2</span> 기록 미리보기 <span style="flex:1"></span><button class="btn btn-ghost"
-                onclick="previewExp()">미리보기</button></h3>
-            <div class="hint">저장 전에 어떤 한 줄로 들어갈지 확인하세요. 빈 칸은 설명에 근거가 없던 컬럼입니다.</div>
-            <div id="expPreview" class="result hidden"></div>
-          </div>
-          <div class="card">
-            <h3><span class="step-no">3</span> 기록 &amp; 차트 갱신</h3>
-            <div class="row"><button class="btn btn-primary" id="expGoBtn" onclick="logExp()">기록 + 자동 차트</button></div>
-            <div id="expResult" class="result hidden"></div>
-          </div>
-        </div>
-
-        <div id="data-dash" class="hidden">
-          <div class="card">
-            <h3><span class="step-no">1</span> 대상 엑셀 &amp; 요청</h3>
-            <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickXlsx()">엑셀 선택</button>
-              <div class="pathbox empty" id="xlsxPath">선택된 파일 없음</div>
-            </div>
-            <textarea id="reqText" placeholder="예) Polaris 파서 종료일 8월 25일로, 진행상태 지연. 서버 GPU 임차 총 350만원으로"></textarea>
-          </div>
-          <div class="card">
-            <h3><span class="step-no">2</span> 변경 미리보기 <span style="flex:1"></span><button class="btn btn-ghost"
-                onclick="previewExcel()">미리보기</button></h3>
-            <div id="excelPreview" class="hidden"></div>
-          </div>
-          <div class="card">
-            <h3><span class="step-no">3</span> 적용 <span style="font-size:12px;color:var(--ink-muted);font-weight:400">·
-                수식·차트 보존</span></h3>
-            <div class="row"><button class="btn btn-primary" onclick="applyExcel()">적용</button></div>
-            <div id="excelResult" class="result hidden"></div>
-          </div>
-        </div>
-
-        <div id="data-analyze" class="hidden">
-          <div class="card">
-            <h3><span class="step-no">1</span> 분석할 엑셀</h3>
-            <div class="hint">생성된 실험/재무 엑셀을 LLM이 읽고 요약·추세·이상치·최적조건을 알려줍니다. (pandas로 빠르게 로드)</div>
-            <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickAnalyze()">엑셀
-                선택</button>
-              <div class="pathbox empty" id="analyzePath">선택된 파일 없음</div>
-            </div>
-            <textarea id="analyzeQ" placeholder="질문(선택). 비우면 자동 요약. 예) 어느 조건에서 정확도가 가장 높아? 이상치 있어?"></textarea>
-          </div>
-          <div class="card">
-            <h3><span class="step-no">2</span> 분석 <span style="font-size:12px;color:var(--ink-muted);font-weight:400">·
-                LLM 필요(로컬이면 다소 느림)</span></h3>
-            <div class="row"><button class="btn btn-primary" id="analyzeBtn" onclick="analyzeExcel()">분석/요약</button>
+            <h3><span class="step-no">2</span> 데이터 분석 및 차트 생성 요청</h3>
+            <textarea id="analyzeQ" class="notion-input" placeholder="질문(선택). 비우면 기본 표 정리 및 차트를 생성합니다. 예) 정확도 추이를 꺾은선 차트로 보여줘."></textarea>
+            <div class="row" style="margin-top:10px"><button class="btn btn-primary" id="analyzeBtn" onclick="analyzeExpData()">분석 및 차트 생성</button>
             </div>
             <div id="analyzeResult" class="result hidden"></div>
+          </div>
+        </div>
+
+        <div id="data-receipt" class="hidden">
+          <div class="card">
+            <h3><span class="step-no">1</span> 영수증 내용 입력</h3>
+            <div class="hint">텍스트 영수증이나 결제 내역을 붙여넣으세요. 이미지 영수증(추후 지원)도 이곳에 텍스트 형태로 우선 적어주시면 정확합니다.</div>
+            <textarea id="receiptText" placeholder="예) 감바식당 회식비 75,000원, 사업자번호 123-45-67890 대표 김감바"></textarea>
+          </div>
+          <div class="card">
+            <h3><span class="step-no">2</span> 템플릿 선택</h3>
+            <div class="row" style="margin-bottom:10px"><button class="btn btn-util" onclick="pickReceiptTpl()">표준 양식 엑셀 선택</button>
+              <div class="pathbox empty" id="receiptTplPath">선택된 파일 없음</div>
+            </div>
+            <div class="hint">기본 제공되는 <span class="mono">planing/엑셀 간이영수증 표준 양식 v2.0.xlsx</span>을 선택하세요.</div>
+          </div>
+          <div class="card">
+            <h3><span class="step-no">3</span> 영수증 엑셀 자동 작성 <span style="font-size:12px;color:var(--ink-muted);font-weight:400">· 수식 보존</span></h3>
+            <div class="row"><button class="btn btn-primary" id="receiptGoBtn" onclick="makeReceipt()">작성 및 저장</button></div>
+            <div id="receiptResult" class="result hidden"></div>
           </div>
         </div>
       </section>
@@ -336,42 +310,53 @@
         <div class="card">
           <h3><span class="step-no">2</span> 옵션</h3>
           <div class="optrow">
-            <label>색상 모드<select id="vecColor" class="modelsel">
+            <label style="grid-column: span 2">🤖 이미지 유형<select id="vecPreset" class="modelsel" onchange="onVecPresetChange(this.value)">
+                <option value="auto" selected>✨ 자동 판별 (권장)</option>
+                <option value="lineart">📄 흑백 선화 — 순서도 · 도면 · 문서 스캔</option>
+                <option value="diagram">📊 컬러 도식 — 다이어그램 · 차트 · 스크린샷</option>
+                <option value="logo">🎨 로고 · 아이콘 · 플랫 일러스트</option>
+                <option value="photo">🖼️ 사진 · 복잡한 그림</option>
+                <option value="custom">🛠️ 수동 직접 설정</option>
+              </select></label>
+            <label>색상 모드<select id="vecColor" class="modelsel" disabled>
                 <option value="color">컬러</option>
                 <option value="binary">흑백(2색)</option>
               </select></label>
-            <label>곡선 방식<select id="vecMode" class="modelsel">
+            <label>곡선 방식<select id="vecMode" class="modelsel" disabled>
                 <option value="spline" selected>곡선 (spline)</option>
-                <option value="pixel">픽셀 (pixel)</option>
                 <option value="polygon">직선 (polygon)</option>
+                <option value="pixel">픽셀 (pixel)</option>
               </select></label>
-            <label>잡티 제거<select id="vecSpeckle" class="modelsel">
-                <option value="2">약 (2)</option>
-                <option value="4" selected>보통 (4)</option>
+            <label>잡티 제거<select id="vecSpeckle" class="modelsel" disabled>
+                <option value="1">최소 (1)</option>
+                <option value="2" selected>약 (2 — 작은 글자 보존)</option>
+                <option value="4">보통 (4)</option>
                 <option value="8">강 (8)</option>
                 <option value="16">매우 강 (16)</option>
               </select></label>
-            <label>색 단순화<select id="vecQuant" class="modelsel">
+            <label>색 단순화<select id="vecQuant" class="modelsel" disabled>
+                <option value="0" selected>원본색 (제한 없음)</option>
                 <option value="8">8색</option>
                 <option value="16">16색</option>
-                <option value="24" selected>24색</option>
+                <option value="24">24색</option>
                 <option value="32">32색</option>
-                <option value="48">48색</option>
                 <option value="64">64색</option>
                 <option value="128">128색</option>
                 <option value="256">256색 (팔레트 최대)</option>
-                <option value="0">원본색 (제한 없음)</option>
               </select></label>
-            <label>해상도<select id="vecRes" class="modelsel">
-                <option value="800" selected>보통 (800px)</option>
-                <option value="1600">높음 (1600px)</option>
-                <option value="4000">최대 (4000px)</option>
-                <option value="0">원본 (파일 그대로)</option>
+            <label>해상도 상한<select id="vecRes" class="modelsel">
+                <option value="0" selected>자동 (유형별 최적)</option>
+                <option value="1200">낮음 (1200px · 가벼움)</option>
+                <option value="2400">높음 (2400px)</option>
+                <option value="4000">최대 (4000px · 느림)</option>
               </select></label>
           </div>
-          <div class="hint" style="margin-top:8px">확대해도 안 깨지는 진짜 벡터로 변환합니다. 로고·아이콘은 원본과 똑같이, <b>사진은 원리상 포스터풍으로 근사</b>됩니다(연속 톤을 벡터로 100% 재현은 불가). 색이 뭉개지면 <b>색 단순화</b>를 24→48→256으로 올리세요.</div>
-          <label class="chk" style="margin-top:14px"><input type="checkbox" id="vecRmBg"> <span><b>배경 제거</b> — 인물·사물만
+          <label class="chk" style="margin-top:14px"><input type="checkbox" id="vecAutotune"> <span><b>정밀 자동 튜닝</b> —
+              여러 설정으로 변환해보고 원본과 가장 닮은 결과를 채택 <span class="warn">3~4배 오래 걸림</span></span></label>
+          <label class="chk" style="margin-top:8px"><input type="checkbox" id="vecRmBg"> <span><b>배경 제거</b> — 인물·사물만
               추출해 투명 배경으로 (로컬 AI, 원할 때만) <span class="warn">첫 사용 시 모델 준비로 잠깐</span></span></label>
+          <div class="hint" style="margin-top:10px">💡 유형별로 <b>전처리(확대·이진화)와 vtracer 파라미터가 자동으로</b> 맞춰집니다.
+            글자가 들어간 이미지는 <b>자동 판별</b> 또는 <b>흑백 선화 / 컬러 도식</b>으로 두세요 — 잡티 제거를 올리면 작은 글자(=, i의 점)가 통째로 사라집니다.</div>
         </div>
         <div class="card">
           <h3><span class="step-no">3</span> 변환</h3>

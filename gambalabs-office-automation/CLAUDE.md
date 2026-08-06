@@ -35,22 +35,33 @@ UI 모드(현재): **테마 개발 · PPT 디자인 · 자동 생성 PPT**(+플�
 - **대시보드 수정**: `llm_extractor.py`(NL→셀) + `excel_updater.py`(openpyxl, 수식·차트 보존, `_is_formula` 가드). 미리보기→적용.
 - **분석/요약**: `excel_analysis.py`(pandas 로드 + LLM 요약/추세/이상치).
 
-### 벡터 변환 (`app/api.py::vectorize`)
-- 비트맵→SVG (visioncortex **vtracer**, `pip install vtracer`). 별도 프로세스+60초 타임아웃(무한로딩 방지).
-- 입력은 Pillow로 **RGBA 정규화**(투명 유지; RGB로 바꾸면 투명→검정 버그) + 800px 다운스케일.
-- HEIC/AVIF/WebP 지원(`pillow-heif`, `pillow-avif-plugin`, api.py에서 등록). 큰 SVG(>180KB)는 인라인 미리보기 생략.
+### 벡터 변환 (`app/api.py::vectorize` + `src/vector/`)
+비트맵→SVG (visioncortex **vtracer**). 별도 프로세스로 실행 → '중지' 버튼으로 kill 취소.
+- `src/vector/vector_autotune.py` — 분류(**lineart/diagram/logo/photo**) · 유형별 전처리 · 후보 파라미터 생성.
+- `src/vector/quality.py` — 결과 SVG를 resvg로 되-래스터화해 원본과 비교(**SSIM + 잉크 IoU**). node/resvg 없으면 `None` 반환(가짜 점수 금지).
+- `app/ppt/_vtrace_run.py` — job.json을 받아 후보들을 트레이스·채점·최적안 채택. 구버전 positional 호출도 유지.
+- 유형별 핵심: 선화=**그레이 2배 확대+Otsu 이진화 → binary 모드**, 컬러 도식=**2배 확대·색 보존·filter_speckle 2**, 사진=축소+32색.
+- **글자 깨짐 3대 원인(수정 완료, 재발 주의)**
+  1. `filter_speckle`을 크게 잡으면 `=`·`i`의 점 같은 작은 획이 통째로 사라진다. (옛 코드: 색 수 6000 초과 시 무조건 10으로 올림 → 도식 텍스트 전멸)
+  2. `length_threshold`의 vtracer 유효 범위는 **[3.5, 10]**. 범위 밖(옛 코드 1.5) 값은 과분할로 경로를 붕괴시킨다. → `clamp_params()`가 강제.
+  3. 트레이스 전 **언샤프 마스킹 금지**. 글자 테두리 헤일로가 별도 색 레이어로 잡혀 획이 이중으로 찍힌다. → 확대만 하고 샤프닝은 안 함.
+- 투명 유지: 입력은 RGBA로 다룬다(RGB로 바꾸면 투명→검정). 선화만 흰 배경 합성 후 이진화.
+- HEIC/AVIF/WebP 지원(`pillow-heif`, `pillow-avif-plugin`, api.py에서 등록).
+- 미리보기: SVG ≤180KB면 인라인, 크면 resvg로 PNG 렌더해 data URI로 표시.
 
 ## 3. 설계 방침 분리 (중요) — `app/ppt/design_policy.py`
 모델 급에 따라 설계 강도를 바꿈(**과제약의 역설** 회피). 자세한 건 README.md 참고.
 - `template`(로컬 3b/7b): 프롬프트 규칙 강제 + 후처리 적극 개입(지시문구 제거·카드 자동변환·1:1 매핑).
-- `freeform`(회사 GPT/Claude): 설계를 모델에 위임, 후처리 최소.
-- 자동 선택: 비로컬 + `gpt-*`/`claude-*` → freeform, 아니면 template. 수동: `.env` `PPT_DESIGN_MODE=auto|template|freeform`.
+- `freeform`(고성능 Groq LPU 70B / OpenAI GPT-4o / Claude): 설계를 모델에 위임, 후처리 최소(풀 컨텍스트 및 자유 레이아웃 생성).
+- 자동 선택: Groq (`groq`), OpenAI (`openai`), 또는 고성능 70B/32B/GPT/Claude 모델 ➡️ **freeform**, 로컬 소형 모델 ➡️ template. 수동: `.env` `PPT_DESIGN_MODE=auto|template|freeform`.
 - 렌더 자동 글자크기: `render_deck.js`의 `fitSize`/`fitList`가 박스에 맞게 폰트 계산(오버플로 방지).
 - 신규 레이아웃: `metrics`(지표 카드), `compare`(2열+도넛), 막대+추세선(`chart.trend`), 그라데이션(`gradient.py`).
 
-## 4. LLM 백엔드 — `.env` (gitignore됨)
-- `OPENAI_BASE_URL`/`OPENAI_MODEL`/`OPENAI_API_KEY` 스왑. 데모=로컬 Ollama(`http://localhost:11434/v1`, `qwen2.5:7b-instruct`/`3b`).
-- 모델 선택 UI(사이드바 7b/3b). **실배포는 회사 GPT로 URL·모델만 교체**(코드 0 변경) → 품질·속도↑.
+## 4. LLM 백엔드 — `src/common/llm_client.py` 및 `.env` (gitignore됨)
+- **Groq (GPT OSS - Llama 3.3 70B, Qwen 2.5 32B, DeepSeek R1)** / **Ollama** / **OpenAI** 3원 통합 팩토리.
+- `LLM_PROVIDER=groq|ollama|openai` 설정 또는 `GROQ_API_KEY` 유무로 자동 감지.
+- Groq 선택 시 `https://api.groq.com/openai/v1` 엔드포인트 및 `GROQ_MODEL=llama-3.3-70b-versatile` 기본 작동.
+- 모델 선택 UI(사이드바). **Groq/Ollama/OpenAI 프로바이더 및 모델 스왑 완비**.
 - 이미지: `PEXELS_API_KEY`(있음, 우선) → 없으면 **Openverse**(키 불필요·CC) 폴백. `image_search.py`.
 - ⚠️ `.env`에 사용자 실제 키 존재 — **절대 출력/커밋 금지**(gitignore 확인).
 

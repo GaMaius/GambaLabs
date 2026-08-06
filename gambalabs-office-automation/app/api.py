@@ -13,6 +13,7 @@ PROJECT_DIR = os.path.dirname(HERE)
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
+from src.common.llm_client import get_llm_client_and_model, get_llm_provider, list_available_models
 from src.excel.llm_extractor import LLMExtractor
 from src.excel.excel_updater import ExcelUpdater
 from src.excel.experiment_logger import ExperimentLogger
@@ -36,9 +37,11 @@ except Exception:
 
 OUTPUT = os.path.join(PROJECT_DIR, "output")
 
-
-def _ts(name, ext):
-    return f"{name}_{datetime.datetime.now().strftime('%m%d_%H%M%S')}.{ext}"
+def _ts(name, ext, sub_dir=""):
+    """타임스탬프 파일명 생성 및 서브 폴더 지정"""
+    out_dir = os.path.join(OUTPUT, sub_dir) if sub_dir else OUTPUT
+    os.makedirs(out_dir, exist_ok=True)
+    return os.path.join(out_dir, f"{name}_{datetime.datetime.now().strftime('%m%d_%H%M%S')}.{ext}")
 
 
 class Api:
@@ -85,7 +88,8 @@ class Api:
         return True
 
     def llm_status(self):
-        return "GPT(온라인)" if (os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_BASE_URL")) else "오프라인 휴리스틱"
+        info = list_available_models()
+        return f"{info['label']} ({info['current']})"
 
     def img_status(self):
         try:
@@ -94,28 +98,23 @@ class Api:
             return "스톡 검색 ON"
 
     def get_llm(self):
-        """현재 모델 + 선택 가능한 모델 목록(로컬 Ollama면 설치된 것들)."""
-        cur = os.getenv("OPENAI_MODEL", "gpt-4o")
-        base = os.getenv("OPENAI_BASE_URL")
-        options = []
-        if base:
-            try:
-                import requests
-                r = requests.get(base.rstrip("/") + "/models", timeout=4)
-                options = [m["id"] for m in r.json().get("data", [])]
-            except Exception:
-                options = []
-        if not options:
-            options = [cur]
-        if cur not in options:
-            options.insert(0, cur)
-        return {"current": cur, "options": options, "backend": base or "OpenAI"}
+        """현재 프로바이더/모델 + 선택 가능한 모델 목록 (Groq GPT OSS / Ollama / OpenAI)."""
+        return list_available_models()
+
+    def set_provider(self, provider_name):
+        if provider_name in ("groq", "ollama", "openai"):
+            os.environ["LLM_PROVIDER"] = provider_name
+            self._chat = None
+        return list_available_models()
 
     def set_model(self, name):
         if name:
+            provider = get_llm_provider()
+            if provider == "groq":
+                os.environ["GROQ_MODEL"] = name
             os.environ["OPENAI_MODEL"] = name
             self._chat = None  # 진행 중 대화는 새 모델로 재시작
-        return {"current": os.getenv("OPENAI_MODEL")}
+        return list_available_models()
 
     # ── 발표자료 테마 선택/추가/제작 ─────────────────
     def get_themes(self):
@@ -406,7 +405,9 @@ class Api:
         try:
             llm = bool(use_llm) and self._import_can_llm()
             plan = ppt_plan_full(doc_path, use_llm=llm, brief=self._brief_text())
-            engine = f"AI 구조화 · {os.getenv('OPENAI_MODEL', 'LLM')}" if llm else "규칙 기반 (즉시)"
+            from app.ppt import design_policy
+            mode = "AI 자유설계" if (llm and not design_policy.is_strict()) else "AI 구조화"
+            engine = f"{mode} · {get_llm_client_and_model()[1]}" if llm else "규칙 기반 (즉시)"
             return {"title": plan.get("title"), "subtitle": plan.get("subtitle"), "engine": engine,
                     "outline": [{"title": s.get("title", ""), "type": s.get("type", "")} for s in plan.get("slides", [])]}
         except Exception as e:
@@ -414,11 +415,13 @@ class Api:
 
     def ppt_make_full(self, doc_path, use_llm=False):
         try:
-            llm = bool(use_llm) and self._import_can_llm()
-            out = os.path.join(OUTPUT, _ts("deck_auto", "pptx"))
-            ppt_generate_full(doc_path, out, theme=self.theme, use_llm=llm,
-                              theme_config=self._theme_config(), brief=self._brief_text())
-            engine = f"AI 구조화 · {os.getenv('OPENAI_MODEL', 'LLM')}" if llm else "규칙 기반"
+            from app.ppt.ppt_engine import generate as ppt_generate_full
+            out = _ts("deck_auto", "pptx", "ppt/auto")
+            ppt_generate_full(doc_path, out, theme=self.theme, use_llm=use_llm, theme_config=self._theme_config(), brief=self._brief_text())
+            from app.ppt import design_policy
+            llm = use_llm and self._import_can_llm()
+            mode = "AI 자유설계" if (llm and not design_policy.is_strict()) else "AI 구조화"
+            engine = f"{mode} · {get_llm_client_and_model()[1]}" if llm else "규칙 기반"
             return {"out": out, "engine": engine}
         except Exception as e:
             return {"error": str(e)}
@@ -441,7 +444,12 @@ class Api:
 
     def ppt_make_spec(self, spec_text):
         try:
-            out = os.path.join(OUTPUT, _ts("deck_design", "pptx"))
+            out = _ts("deck_design", "pptx", "ppt/spec")
+            from app.ppt import design_policy
+            if self._import_can_llm() and not design_policy.is_strict():
+                from app.ppt.freeform_engine import generate_freeform
+                generate_freeform(spec_text or "", out, theme=self.theme, theme_config=self._theme_config(), brief=self._brief_text())
+                return {"out": out, "images": []}
             ppt_generate_spec(spec_text or "", out, image_fetch=image_search.fetch_image, theme=self.theme, theme_config=self._theme_config())
             return {"out": out, "images": image_search.available()}
         except Exception as e:
@@ -453,7 +461,17 @@ class Api:
         try:
             if r.get("type") in ("sample", "final") and r.get("plan"):
                 tag = "deck_sample" if r["type"] == "sample" else "deck_chat"
-                out = os.path.join(OUTPUT, _ts(tag, "pptx"))
+                out = _ts(tag, "pptx", "ppt/chat")
+                
+                from app.ppt import design_policy
+                if self._import_can_llm() and not design_policy.is_strict():
+                    from app.ppt.freeform_engine import generate_freeform
+                    plan_text = json.dumps(r["plan"], ensure_ascii=False, indent=2)
+                    generate_freeform(plan_text, out, theme=self.theme, theme_config=self._theme_config(), brief=self._brief_text())
+                    r["out"] = out
+                    r["outline"] = [s.get("title", "") for s in r["plan"].get("slides", [])]
+                    return r
+
                 render_plan(r["plan"], out, image_fetch=image_search.fetch_image, theme=self.theme, theme_config=self._theme_config())
                 r["out"] = out
                 r["outline"] = [s.get("title", "") for s in r["plan"].get("slides", [])]
@@ -497,7 +515,7 @@ class Api:
                 if s.get("image"):
                     extras.append(f"이미지:{s['image'].get('query','')}")
                 out.append({"title": s.get("title", ""), "extras": ", ".join(extras)})
-            engine = f"AI 해석 · {os.getenv('OPENAI_MODEL', 'LLM')}" if llm else "규칙 기반 (즉시)"
+            engine = f"AI 해석 · {get_llm_client_and_model()[1]}" if llm else "규칙 기반 (즉시)"
             return {"title": plan.get("title"), "subtitle": plan.get("subtitle", ""), "outline": out, "engine": engine}
         except Exception as e:
             return {"error": str(e)}
@@ -507,80 +525,49 @@ class Api:
             return {"error": "파워포인트 파일을 선택하세요."}
         try:
             llm = bool(use_llm) and self._import_can_llm()
+            out = os.path.join(OUTPUT, _ts("deck_from_ppt", "pptx", "ppt/import"))
+            from app.ppt import design_policy
+            # 강한 모델이면 freeform 엔진(슬라이드 텍스트를 문서로 전달) 시도
+            if llm and not design_policy.is_strict():
+                from app.ppt.freeform_engine import generate_freeform_from_slides
+                slides_text = "\n\n".join(
+                    f"[슬라이드 {i+1}]\n" + "\n".join(ts)
+                    for i, ts in enumerate(pptx_import.extract_slides(pptx_path)) if ts)
+                generate_freeform_from_slides(
+                    slides_text, out, theme=self.theme,
+                    theme_config=self._theme_config(), brief=self._brief_text())
+                engine = f"AI 자유설계 · {get_llm_client_and_model()[1]}"
+                return {"out": out, "engine": engine}
+            
+            # 폴백: 기존 JSON Plan + render_deck.js
             plan = pptx_import.build_plan(pptx_path, use_llm=llm, brief=self._brief_text())
-            out = os.path.join(OUTPUT, _ts("deck_from_ppt", "pptx"))
             render_plan(plan, out, image_fetch=image_search.fetch_image, theme=self.theme, theme_config=self._theme_config())
-            engine = f"AI 해석 · {os.getenv('OPENAI_MODEL', 'LLM')}" if llm else "규칙 기반"
+            engine = f"AI 해석 · {get_llm_client_and_model()[1]}" if llm else "규칙 기반"
             return {"out": out, "count": len(plan.get("slides", [])), "engine": engine}
         except Exception as e:
             return {"error": str(e)}
 
-    # ── 데이터: 대시보드 셀 수정(수식 보존) ───────────
-    def excel_preview(self, request_text, xlsx_path):
-        if not xlsx_path or not os.path.exists(xlsx_path):
-            return {"error": "대상 엑셀을 선택하세요."}
+    # ── 데이터: 자동 영수증 작성 ───────────────────────
+    def excel_make_receipt(self, text, template_path):
+        if not text:
+            return {"error": "영수증 내용을 입력하세요."}
+        if not template_path or not os.path.exists(template_path):
+            return {"error": "영수증 표준 엑셀 양식을 선택하세요."}
         try:
-            return {"updates": LLMExtractor().extract_updates(request_text or "", xlsx_path), "engine": self.llm_status()}
+            from src.excel.receipt_engine import generate_receipt
+            out = _ts("receipt", "xlsx", "excel/receipt")
+            result = generate_receipt(text, template_path, out)
+            return result
         except Exception as e:
             return {"error": str(e)}
 
-    def excel_apply(self, request_text, xlsx_path, updates=None):
-        try:
-            if updates is None:
-                updates = LLMExtractor().extract_updates(request_text or "", xlsx_path)
-            if not updates:
-                return {"error": "반영할 변경이 없습니다."}
-            out = os.path.join(OUTPUT, _ts("updated_dashboard", "xlsx"))
-            logs = ExcelUpdater().apply_updates(xlsx_path, updates, out)
-            return {"logs": logs, "out": out}
-        except Exception as e:
-            return {"error": str(e)}
-
-    # ── 데이터: Excel → LLM 분석/요약 ────────────────
-    def excel_analyze(self, xlsx_path, question):
+    # ── 데이터: 실험 기록 ───────────────────────────
+    def tracker_analyze(self, xlsx_path, question):
         if not xlsx_path or not os.path.exists(xlsx_path):
-            return {"error": "분석할 엑셀을 선택하세요."}
+            return {"error": "분석할 트래커 엑셀을 선택하세요."}
         try:
+            from src.excel import excel_analysis
             return excel_analysis.analyze(xlsx_path, question or None)
-        except Exception as e:
-            return {"error": str(e)}
-
-    # ── 데이터: 실험/재무 기록 + 자동 차트 ────────────
-    def exp_log_preview(self, xlsx_path, description, use_llm=False):
-        """저장 전에, 자연어 설명이 어떤 한 행으로 기록될지 미리보기."""
-        if not xlsx_path or not os.path.exists(xlsx_path):
-            return {"error": "트래커 엑셀을 선택하세요."}
-        if not (description or "").strip():
-            return {"error": "기록할 결과 설명을 입력하세요."}
-        try:
-            llm = bool(use_llm) and self._import_can_llm()
-            return ExperimentLogger().preview_result(xlsx_path, description, use_llm=llm)
-        except Exception as e:
-            return {"error": str(e)}
-
-    def exp_log(self, xlsx_path, description, use_llm=False, chart_mode="auto", in_place=False):
-        if not xlsx_path or not os.path.exists(xlsx_path):
-            return {"error": "트래커 엑셀을 선택하세요."}
-        if not (description or "").strip():
-            return {"error": "기록할 결과 설명을 입력하세요."}
-        try:
-            llm = bool(use_llm) and self._import_can_llm()
-            if in_place:
-                # 선택한 파일에 직접 누적(원본에 계속 쌓기)
-                read_path = out = xlsx_path
-            else:
-                # 트래커별 '안정 파일명'으로 누적 — 매번 새 파일이 아니라 한 파일에 쌓인다.
-                base = os.path.splitext(os.path.basename(xlsx_path))[0]
-                if base.endswith("_log"):
-                    base = base[:-4]
-                out = os.path.join(OUTPUT, base + "_log.xlsx")
-                # 누적 로그가 이미 있으면 그걸 이어 쓴다(원본 재선택 시 누적 유실 방지)
-                read_path = out if (os.path.exists(out) and
-                                    os.path.abspath(out) != os.path.abspath(xlsx_path)) else xlsx_path
-            res = ExperimentLogger().append_result(read_path, description, out, use_llm=llm,
-                                                    chart_mode=(chart_mode or "auto"))
-            res["in_place"] = bool(in_place)
-            return res
         except Exception as e:
             return {"error": str(e)}
 
@@ -630,8 +617,18 @@ class Api:
             self._rembg_session = new_session("u2netp")   # 경량 모델(빠름·소용량)
         return remove(im, session=self._rembg_session).convert("RGBA")
 
-    # ── 벡터 변환: 비트맵 → SVG (visioncortex/vtracer) ──
-    def vectorize(self, image_path, colormode="color", mode="spline", filter_speckle=4, remove_bg=False, quantize=0, max_dim=800):
+    # ── 벡터 변환: 비트맵 → SVG (visioncortex/vtracer + VectorAutotuner) ──
+    def vectorize(self, image_path, colormode="auto", mode="auto", filter_speckle="auto",
+                  remove_bg=False, quantize="auto", max_dim=0, preset="auto", autotune=False):
+        """비트맵 → SVG.
+
+        preset: auto | lineart | diagram | logo | photo | custom
+          - auto  : 이미지 분석으로 유형 자동 판별
+          - custom: UI에서 고른 값(colormode/mode/filter_speckle/quantize)을 그대로 사용
+        autotune: 후보 파라미터를 여러 개 돌려 원본과 가장 닮은 결과를 채택(느림, 정밀).
+        max_dim: 트레이스 해상도 상한(0=유형별 기본값)
+        """
+        import json
         import subprocess
         if not image_path or not os.path.exists(image_path):
             return {"error": "이미지를 선택하세요."}
@@ -640,89 +637,101 @@ class Api:
         except Exception:
             return {"error": "vtracer 미설치. 터미널에서 'pip install vtracer' 후 다시 시도하세요."}
         try:
+            from src.vector.vector_autotune import VectorAutotuner, METRIC, PRESETS
+        except Exception as e:
+            return {"error": f"벡터 엔진 로드 실패({type(e).__name__}: {e}). 'pip install opencv-python scikit-image' 확인."}
+
+        tmp_dir = os.path.join(OUTPUT, "_images")
+        os.makedirs(tmp_dir, exist_ok=True)
+
+        try:
             in_size = os.path.getsize(image_path)
+
+            # ── 1) 분석 ──
             try:
-                fs = int(filter_speckle)
-            except Exception:
-                fs = 4
-            # Pillow로 반드시 깨끗한 PNG(ASCII 경로)로 정규화 — vtracer는 원본을 넘기면
-            # 형식에 따라 "No image file found" 패닉을 낸다. Pillow가 못 읽으면 명확히 안내.
-            downscaled = False
-            noisy = False
-            tmp_dir = os.path.join(OUTPUT, "_images")
-            os.makedirs(tmp_dir, exist_ok=True)
-            src = os.path.join(tmp_dir, "_vsrc.png")
-            try:
-                from PIL import Image
-                im = Image.open(image_path)
-                im.load()
-                # RGBA 유지: 투명 배경을 살려 vtracer가 투명 영역을 건너뛰게 함.
-                # (RGB로 바꾸면 투명 부분이 검정으로 합성돼 배경이 시커멓게 나옴)
-                im = im.convert("RGBA")
+                tuner = VectorAutotuner(image_path)
             except Exception as e:
                 return {"error": f"이미지를 읽을 수 없습니다({type(e).__name__}). PNG·JPG로 저장한 파일로 다시 시도하세요."}
 
-            w, h = im.size
-            try:
-                md = int(max_dim)
-            except Exception:
-                md = 800
-            if md <= 0:
-                MAX = min(max(w, h), 8000)    # '원본' = 파일 실제 해상도 그대로(안전상 8000 상한)
+            prof = tuner.profile()
+            if preset in PRESETS:
+                category = preset
+            elif preset == "custom":
+                category = tuner.classify()
             else:
-                MAX = min(max(md, 200), 8000)
-            if max(w, h) > MAX:
-                sc = MAX / max(w, h)
-                im = im.resize((max(1, int(w * sc)), max(1, int(h * sc))))
-                downscaled = True
+                category = tuner.classify()
+
+            # ── 2) 배경 제거(선택) — 이후 단계는 제거된 이미지를 원본으로 취급 ──
             removed = False
-            if remove_bg:   # 원할 때만: 배경 제거(투명) 후 벡터화 → 피사체만 깔끔히
+            work_path = image_path
+            if remove_bg:
                 try:
-                    im = self._remove_bg(im)
+                    cut = self._remove_bg(tuner.im_pil)
+                    work_path = os.path.join(tmp_dir, "_vsrc_nobg.png")
+                    cut.save(work_path)
+                    tuner = VectorAutotuner(work_path)
+                    prof = tuner.profile()
                     removed = True
                 except Exception as e:
                     return {"error": f"배경 제거 실패({type(e).__name__}: {e}). 'pip install rembg[cpu]' 확인."}
-            # 색 단순화(포스터화): 복잡한 사진·그림을 N색으로 줄여 깔끔한 벡터로 (알파 보존)
-            try:
-                n = int(quantize)
-            except Exception:
-                n = 0
-            if n >= 2:
+
+            # ── 3) 후보 파라미터 ──
+            overrides = {}
+            q_override = None
+            if preset == "custom":
+                if colormode in ("color", "binary"):
+                    overrides["colormode"] = colormode
+                if mode in ("spline", "polygon", "pixel"):
+                    overrides["mode"] = mode
                 try:
-                    from PIL import Image as _Img
-                    if im.mode == "RGBA":
-                        alpha = im.getchannel("A")
-                        rgb = im.convert("RGB").quantize(colors=n, method=_Img.MEDIANCUT).convert("RGB")
-                        im = rgb.convert("RGBA")
-                        im.putalpha(alpha)
-                    else:
-                        im = im.convert("RGB").quantize(colors=n, method=_Img.MEDIANCUT).convert("RGB")
+                    overrides["filter_speckle"] = int(filter_speckle)
                 except Exception:
                     pass
-            try:  # 색이 매우 많으면(사진) 속도·용량 위해 잡티 제거 강화
-                if colormode == "color" and len(im.getcolors(maxcolors=20000) or [1] * 20001) > 6000:
-                    noisy = True
-                    fs = max(fs, 10)
-            except Exception:
-                pass
-            try:
-                im.save(src)
-            except Exception as e:
-                return {"error": f"임시 이미지 저장 실패({e})."}
-            if not os.path.exists(src):
-                return {"error": "임시 이미지 생성에 실패했습니다."}
+                try:
+                    q_override = int(quantize)
+                except Exception:
+                    q_override = None
 
-            out = os.path.join(OUTPUT, _ts("vector", "svg"))  # 출력은 ASCII 고정명(경로 문제 방지)
-            cprec = 8   # 색 정밀도 최대 — 원본에 최대한 가깝게(트레이스는 원리상 포스터화됨)
+            try:
+                cap = int(max_dim)
+            except Exception:
+                cap = 0
+
+            cands = tuner.build_candidates(category, autotune=bool(autotune),
+                                           overrides=overrides, cap=cap, quantize=q_override,
+                                           max_tries=4 if autotune else 1)
+
+            # ── 4) 후보별 전처리 이미지 저장 ──
+            job_cands, dims = [], None
+            for i, c in enumerate(cands):
+                try:
+                    im = tuner.preprocess(category, upscale=c["upscale"], cap=cap, quantize=c["quantize"])
+                except Exception as e:
+                    return {"error": f"전처리 실패({type(e).__name__}: {e})"}
+                p = os.path.join(tmp_dir, f"_vsrc{i}.png")
+                im.save(p)
+                if dims is None:
+                    dims = list(im.size)
+                job_cands.append({"label": c["label"], "src": p, "params": c["params"]})
+
+            out = _ts("vector", "svg", "vector")  # 출력은 ASCII 고정명(경로 문제 방지)
+            job = {"out": out, "ref": work_path, "metric": METRIC.get(category, "color"),
+                   "workdir": tmp_dir, "candidates": job_cands, "score": True}
+            job_path = os.path.join(tmp_dir, "_vjob.json")
+            with open(job_path, "w", encoding="utf-8") as f:
+                json.dump(job, f, ensure_ascii=False)
+
+            # ── 5) 별도 프로세스 실행(시간제한 없음 — '중지' 버튼으로 취소) ──
             runner = os.path.join(HERE, "ppt", "_vtrace_run.py")
-            # 별도 프로세스(시간제한 없음) — 오래 걸리면 사용자가 '중지' 버튼으로 취소
             self._vec_cancelled = False
-            proc = subprocess.Popen(
-                [sys.executable, runner, src, out, str(colormode), str(mode), str(fs), str(cprec)],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            # 파이프는 UTF-8 고정 — 한글 후보 라벨이 cp949 콘솔 인코딩에 깨지지 않도록.
+            env = dict(os.environ, PYTHONIOENCODING="utf-8")
+            proc = subprocess.Popen([sys.executable, runner, job_path],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, encoding="utf-8", errors="replace", env=env)
             self._vec_proc = proc
             try:
-                _out_t, err_t = proc.communicate()   # 완료 또는 kill될 때까지 대기(무한 아님: 사용자 취소 가능)
+                out_t, err_t = proc.communicate()
             finally:
                 self._vec_proc = None
             if self._vec_cancelled:
@@ -734,10 +743,20 @@ class Api:
                         pass
                 return {"cancelled": True}
             if proc.returncode != 0 or not os.path.exists(out):
-                return {"error": f"변환 실패: {(err_t or '')[-300:]}"}
+                return {"error": f"변환 실패: {(err_t or out_t or '')[-300:]}"}
+
+            report = {}
+            for line in (out_t or "").splitlines():
+                line = line.strip()
+                if line.startswith("{"):
+                    try:
+                        report = json.loads(line)
+                    except Exception:
+                        pass
+            best = report.get("best", {})
 
             out_size = os.path.getsize(out)
-            svg, preview = "", False
+            svg, preview, preview_png = "", False, ""
             if out_size <= 180_000:          # 큰 SVG 인라인 렌더는 webview를 멈추므로 상한
                 try:
                     with open(out, "r", encoding="utf-8") as f:
@@ -745,8 +764,34 @@ class Api:
                     preview = True
                 except Exception:
                     pass
-            return {"out": out, "svg": svg, "preview": preview, "downscaled": downscaled,
-                    "noisy": noisy, "removed_bg": removed, "dims": [im.size[0], im.size[1]],
-                    "orig_dims": [w, h], "in_size": in_size, "out_size": out_size}
+            else:
+                # 용량이 크면 결과 SVG를 PNG로 렌더해 미리보기로 보여준다(미리보기 없음 방지).
+                try:
+                    import base64
+                    from src.vector.quality import rasterize, node_available
+                    if node_available():
+                        pv = os.path.join(tmp_dir, "_vpreview.png")
+                        if rasterize(out, pv, 760, timeout=90):
+                            with open(pv, "rb") as f:
+                                preview_png = "data:image/png;base64," + base64.b64encode(f.read()).decode("ascii")
+                except Exception:
+                    pass
+
+            return {
+                "out": out, "svg": svg, "preview": preview, "preview_png": preview_png,
+                "removed_bg": removed,
+                "dims": dims, "orig_dims": [prof["w"], prof["h"]],
+                "upscaled": bool(dims and dims[0] > prof["w"]),
+                "in_size": in_size, "out_size": out_size,
+                "category": category,
+                "params": best.get("params", {}),
+                "variant": best.get("label"),
+                # 채점 불가(node/resvg 없음)면 None — UI에서 표시하지 않는다.
+                "ssim": (round(best["ssim"] * 100, 1) if best.get("ssim") is not None else None),
+                "ink_f1": (round(best["ink_f1"] * 100, 1) if best.get("ink_f1") is not None else None),
+                "tried": [{"label": t.get("label"), "ssim": t.get("ssim"),
+                           "ink_f1": t.get("ink_f1"), "size": t.get("size")}
+                          for t in report.get("tried", [])],
+            }
         except Exception as e:
             return {"error": str(e)}

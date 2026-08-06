@@ -38,9 +38,9 @@ const PPT_MODEHELP = {
   prompt: ["var(--purple)", "✎", "프롬프트 생성", "디자인 설정과 주제를 묶어 GPT·Claude·Gemini 등 아무 LLM에 붙여넣을 프롬프트를 만들어 복사합니다.", ["① 주제 입력", "② 옵션", "③ 생성·복사"]],
 };
 const DATA_MODEHELP = {
-  exp: ["var(--teal)", "📈", "실험/재무 기록 + 자동 차트", "결과를 자연어로 적으면 트래커에 한 줄로 기록하고 추이 차트를 자동 갱신합니다. 같은 파일에 계속 누적돼요.", ["① 트래커 선택/생성", "② 기록 미리보기", "③ 기록 + 차트"]],
-  dash: ["var(--teal)", "▤", "대시보드 수정", "기존 엑셀을 자연어로 수정합니다. 수식·차트는 그대로 두고 값만 바꿔요.", ["① 엑셀 선택 + 요청", "② 변경 미리보기", "③ 적용"]],
-  analyze: ["var(--teal)", "🔎", "분석 · 요약", "엑셀을 AI가 읽고 핵심 요약·추세·이상치·최적 조건을 알려줍니다.", ["① 엑셀 선택", "② 분석/요약"]],
+  "exp-code": ["var(--teal)", "⚡", "실험 기록 코드 삽입", "수동 입력 없이 파이썬이나 C/C++ 코드 레벨에서 바로 트래커에 실험 결과를 기록합니다.", ["① 언어 선택", "② 코드 복사", "③ 스크립트 적용"]],
+  "exp-analyze": ["var(--teal)", "🔎", "엑셀 분석/차트", "기록된 엑셀 데이터를 바탕으로 AI가 요약 분석하고 차트를 생성합니다.", ["① 트래커 선택", "② 질문 입력", "③ 분석 및 차트"]],
+  "receipt": ["var(--teal)", "🧾", "자동 영수증 작성", "자연어 결제 내역을 영수증 표준 엑셀 폼에 깔끔하게 채워줍니다.", ["① 내역 입력", "② 양식 선택", "③ 영수증 생성"]],
 };
 function mhRender(el, spec) {
   if (!el || !spec) return;
@@ -59,7 +59,10 @@ function pptMode(m) {
 }
 function dataMode(m) {
   document.querySelectorAll('#tab-data .seg button').forEach((x) => x.classList.toggle("on", x.dataset.m === m));
-  ["exp", "dash", "analyze"].forEach((k) => $("data-" + k).classList.toggle("hidden", k !== m));
+  ["exp-code", "exp-analyze", "receipt"].forEach((k) => {
+    const el = $("data-" + k);
+    if (el) el.classList.toggle("hidden", k !== m);
+  });
   mhRender($("data-modehelp"), DATA_MODEHELP[m]);
 }
 /* 클립보드 복사(공용) */
@@ -72,15 +75,39 @@ function copyText(txt) {
   try { if (navigator.clipboard) { navigator.clipboard.writeText(txt); ok = true; } } catch (e) {}
   document.body.removeChild(ta); return ok;
 }
-/* 실험 로거 스니펫(실제 프로젝트 경로 삽입) */
-async function fillSnippet() {
+/* 실험 로거 스니펫 */
+async function setSnippetLang(lang) {
   const el = $("expSnippet"); if (!el) return;
   let dir = "";
   try { dir = await api().project_dir(); } catch (e) {}
-  el.textContent =
-    `import sys; sys.path.insert(0, r"${dir || '...\\\\gambalabs-office-automation'}")\n` +
-    `from gamba_log import log_result\n\n` +
-    `log_result({"정확도(%)": 92.3, "SNR(dB)": -20, "오인식(건)": 1, "비고": "튜닝"})`;
+  document.querySelectorAll('#data-exp-code .seg button').forEach(b => b.classList.toggle("on", b.dataset.lang === lang));
+  
+  if (lang === "python") {
+    el.textContent =
+      `import os, sys\n` +
+      `ROOT_DIR = r"${dir || '...\\\\gambalabs-office-automation'}"\n` +
+      `if ROOT_DIR not in sys.path: sys.path.insert(0, ROOT_DIR)\n\n` +
+      `from gamba_log import enable_print_logger\n\n` +
+      `# 🌟 최상단에 선언해 두면 이후 모든 print() 출력이 엑셀로 자동 파싱/기록됩니다!\n` +
+      `TRACKER_PATH = os.path.join(ROOT_DIR, "output", "excel", "tracker", "log.xlsx")\n` +
+      `enable_print_logger(tracker=TRACKER_PATH, sheet="실험기록")\n\n` +
+      `# -----------------------------------------------------------------\n` +
+      `# (기존 코드 수정 없이) 아래처럼 print()만 찍으시면 엑셀에 자동 저장됩니다!\n` +
+      `print("Epoch 1 - accuracy: 91.2% snr: -20dB loss: 0.245 (기본 모델)")`;
+    el.className = "codebox hljs language-python";
+  } else if (lang === "c") {
+    const escDir = (dir || "...\\\\gambalabs-office-automation").replace(/\\/g, "\\\\");
+    el.textContent =
+      `#include "gamba_log.h"\n\n` +
+      `// 빌드 시 gamba_log.c 포함 필요\n` +
+      `gamba_log_set_tracker("${escDir}\\\\output\\\\excel\\\\tracker\\\\log.xlsx");\n` +
+      `gamba_log_add_float("정확도(%)", 92.3f);\n` +
+      `gamba_log_add_int("오인식(건)", 1);\n` +
+      `gamba_log_add_string("비고", "튜닝");\n` +
+      `gamba_log_commit();`;
+    el.className = "codebox hljs language-c";
+  }
+  if (window.hljs) hljs.highlightElement(el);
 }
 function copySnippet() { const el = $("expSnippet"); if (el) copyText(el.textContent); }
 
@@ -94,7 +121,7 @@ async function initStatus() {
     const sel = $("modelSel"); sel.innerHTML = "";
     r.options.forEach((m) => { const o = document.createElement("option"); o.value = m; o.textContent = MODEL_LABEL(m); if (m === r.current) o.selected = true; sel.appendChild(o); });
     refreshThemes(await api().get_themes());
-    fillSnippet();
+    setSnippetLang('python');
   } catch (e) {}
 }
 let THEME_OPTS = [];
@@ -321,8 +348,8 @@ function helpDontShow() { localStorage.setItem("helpHide", $("helpDontShow").che
 window.addEventListener("pywebviewready", initStatus);
 renderRefs(); markFilled();   // 폼 초기 상태(참고자료 목록·배지·스와치)
 mhRender($("ppt-modehelp"), PPT_MODEHELP.theme);   // 초기 모드 설명
-mhRender($("data-modehelp"), DATA_MODEHELP.exp);
-fillSnippet();   // 경로 미확정 시 폴백 표시(이후 initStatus에서 실제 경로로 갱신)
+mhRender($("data-modehelp"), DATA_MODEHELP["exp-code"]);
+setSnippetLang('python');   // 경로 미확정 시 폴백 표시(이후 initStatus에서 실제 경로로 갱신)
 
 /* ── PPT 풀 자동 ── */
 async function pickPpt() { const p = await api().pick_file("doc"); if (p) { PPT = p; setPath("pptPath", p); } }
@@ -457,71 +484,92 @@ async function newTracker() {
     if (r.cancelled) return box.classList.add("hidden");
     if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
     EXP = r.out; setPath("expPath", r.out);   // 만든 트래커를 바로 현재 대상으로
-    show(box, `<span class="ok">✅ 트래커 생성됨</span> <span class="mono">${esc(r.headers.join(" · "))}</span><div style="margin-top:6px">이제 아래에 결과를 적고 <b>기록</b>하세요. <button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
+    show(box, `<span class="ok">✅ 트래커 생성됨</span> <span class="mono">${esc(r.headers.join(" · "))}</span><div style="margin-top:6px">이제 <b>코드 삽입</b> 탭에서 스크립트에 로거를 추가하세요. <button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
 }
-function expRowTable(headers, mapped, blanks) {
-  const bset = new Set(blanks || []);
-  const th = headers.map((h) => `<th>${esc(h)}</th>`).join("");
-  const td = headers.map((h) => { const v = mapped[h]; const empty = bset.has(h) || v === "" || v == null; return `<td class="${empty ? "to" : ""}">${empty ? "—" : esc(v)}</td>`; }).join("");
-  return `<table class="chg"><tr>${th}</tr><tr>${td}</tr></table>`;
-}
-async function previewExp() {
+async function analyzeExpData() {
   if (!EXP) return alert("트래커 엑셀을 선택하세요.");
-  const llm = true; const box = $("expPreview");   // LLM 항상 사용
-  spin(box, llm ? "AI가 해석 중… (로컬 모델이면 수 초~수십 초)" : "해석 중…"); show(box);
-  const r = await api().exp_log_preview(EXP, $("expText").value, llm);
+  const box = $("analyzeResult");
+  spin(box, "AI가 데이터를 분석하고 있습니다… (수십 초 이상 소요될 수 있습니다)"); show(box);
+  const q = $("analyzeQ").value.trim();
+  const r = await api().tracker_analyze(EXP, q);
   if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
-  const warn = (r.blanks && r.blanks.length) ? `<div class="hint" style="margin-top:6px">빈 칸(설명에 근거 없음): ${r.blanks.map(esc).join(", ")}</div>` : "";
-  show(box, `<div class="pill">${esc(r.engine)} · ${esc(r.sheet)}</div>${expRowTable(r.headers, r.mapped, r.blanks)}${warn}`);
-}
-async function logExp() {
-  if (!EXP) return alert("트래커 엑셀을 선택하세요."); const llm = true; const cm = $("expChart").value;   // LLM 항상 사용
-  const inPlace = $("expInPlace").checked;
-  const box = $("expResult"); spin(box, llm ? "AI 파싱 후 기록 중…" : "기록 중…"); show(box); $("expGoBtn").disabled = true;
-  const r = await api().exp_log(EXP, $("expText").value, llm, cm, inPlace); $("expGoBtn").disabled = false;
-  if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
-  const rowHtml = Object.entries(r.appended).map(([k, v]) => `<div class="mono">• ${esc(k)}: ${esc(v === null || v === "" ? "—" : v)}</div>`).join("");
-  const metric = r.chart_metric ? ` · 차트 지표: <b>${esc(r.chart_metric)}</b>` : "";
-  EXP = r.out; setPath("expPath", r.out);   // 누적: 방금 기록한 파일을 다음 기록의 대상으로 자동 연결
-  show(box, `<span class="ok">✅ ${esc(r.sheet)}에 기록 (총 ${r.total_rows}행)</span> <span class="t">${esc(r.engine || "")}</span>${metric}${rowHtml}<span class="mono">${esc(r.out)}</span><div style="margin-top:6px"><span class="hint">${r.in_place ? "선택한 파일에 직접 누적됩니다." : "이 로그 파일에 계속 누적됩니다(한 개)."}</span> <button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
+  
+  // r.answer 에 마크다운 텍스트(표, 통계 포함) 반환됨. 간단히 렌더링.
+  // hljs 나 marked 가 있다면 좋겠지만 없으면 esc 후 보존
+  const formatted = esc(r.answer).replace(/\n/g, "<br>");
+  show(box, `<span class="ok">✅ 분석 완료</span><div style="margin-top:10px; font-size:14px; line-height:1.6; color:var(--ink-2); background:var(--canvas); padding:12px; border-radius:8px;">${formatted}</div>`);
 }
 
-/* ── 데이터: Excel→LLM 분석/요약 ── */
-let ANALYZE = "";
-async function pickAnalyze() { const p = await api().pick_file("xlsx"); if (p) { ANALYZE = p; setPath("analyzePath", p); } }
-async function analyzeExcel() {
-  if (!ANALYZE) return alert("엑셀을 선택하세요."); const box = $("analyzeResult"); spin(box, "분석 중… (로컬 모델이면 시간이 걸려요)"); show(box); $("analyzeBtn").disabled = true;
+
+/* ── 데이터: 자동 영수증 작성 ── */
+let RECEIPT_TPL = ""; // 사용자 선택 양식 (기본값 설정됨)
+async function initReceiptTpl() {
+  let dir = "";
+  try { dir = await api().project_dir(); } catch (e) {}
+  if(dir) {
+    RECEIPT_TPL = dir + "\\planing\\엑셀 간이영수증 표준 양식 v2.0.xlsx";
+    setPath("receiptTplPath", RECEIPT_TPL);
+  }
+}
+async function pickReceiptTpl() {
+  const p = await api().pick_file("xlsx");
+  if (p) { RECEIPT_TPL = p; setPath("receiptTplPath", p); }
+}
+async function makeReceipt() {
+  const text = $("receiptText").value.trim();
+  if (!text) return alert("영수증 내용(텍스트)을 입력하세요.");
+  // Default to standard template if not selected
+  if (!RECEIPT_TPL) {
+    await initReceiptTpl();
+  }
+  const box = $("receiptResult"); spin(box, "AI가 영수증 분석 및 엑셀 생성 중…"); show(box); $("receiptGoBtn").disabled = true;
   try {
-    const r = await api().excel_analyze(ANALYZE, $("analyzeQ").value);
+    const r = await api().excel_make_receipt(text, RECEIPT_TPL);
     if (r.error) show(box, `<span class="err">${esc(r.error)}</span>`);
-    else show(box, `<div style="white-space:pre-wrap;line-height:1.6">${esc(r.answer)}</div>`);
+    else show(box, `<span class="ok">✅ 자동 작성 완료 (수식 보존)</span> <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
-  $("analyzeBtn").disabled = false;
+  $("receiptGoBtn").disabled = false;
 }
 
 /* ── 벡터 변환 (비트맵 → SVG) ── */
 let VEC = "";
 async function pickVec() { const p = await api().pick_file("image"); if (p) { VEC = p; setPath("vecPath", p); } }
+const VEC_CATNAME = { lineart: "흑백 선화", diagram: "컬러 도식", logo: "로고·아이콘", photo: "사진" };
+// 수동 설정 칸은 '수동 직접 설정'일 때만 열어 둔다 — 그 외에는 유형별 프리셋이 값을 정한다.
+function onVecPresetChange(preset) {
+  const manual = preset === "custom";
+  ["vecColor", "vecMode", "vecSpeckle", "vecQuant"].forEach((id) => { $(id).disabled = !manual; });
+}
+
 async function vectorize() {
   if (!VEC) return alert("이미지를 선택하세요.");
   const rmbg = $("vecRmBg").checked;
-  const box = $("vecResult"); spin(box, (rmbg ? "배경 제거 후 " : "") + "벡터 변환 중… 오래 걸리면 ■ 중지로 취소하세요"); show(box); $("vecBtn").disabled = true;
+  const at = $("vecAutotune").checked;
+  const box = $("vecResult");
+  spin(box, (rmbg ? "배경 제거 후 " : "") + (at ? "정밀 자동 튜닝 중(후보 여러 개 비교)… " : "벡터 변환 중… ") + "오래 걸리면 ■ 중지로 취소하세요");
+  show(box); $("vecBtn").disabled = true;
   $("vecStop").classList.remove("hidden");
   $("vecPreview").classList.add("hidden");
   try {
-    const r = await api().vectorize(VEC, $("vecColor").value, $("vecMode").value, $("vecSpeckle").value, rmbg, $("vecQuant").value, $("vecRes").value);
+    const r = await api().vectorize(VEC, $("vecColor").value, $("vecMode").value, $("vecSpeckle").value, rmbg, $("vecQuant").value, $("vecRes").value, $("vecPreset").value, at);
     if (r.cancelled) { show(box, `<span class="err">■ 변환을 중지했습니다.</span>`); }
     else if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); }
     else {
       const kb = (n) => (n / 1024).toFixed(0) + "KB";
-      const dm = r.dims ? ` · ${r.dims[0]}×${r.dims[1]}px` + (r.orig_dims && r.dims[0] === r.orig_dims[0] ? "(원본)" : "") : "";
+      const dm = r.dims ? ` · ${r.dims[0]}×${r.dims[1]}px${r.upscaled ? "(확대 트레이스)" : ""}` : "";
       const ds = dm + (r.removed_bg ? " · 배경 제거됨" : "");
-      show(box, `<span class="ok">✅ 변환 완료</span> <span class="mono">${kb(r.in_size)} → ${kb(r.out_size)} SVG</span>${ds} <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
+      const cat = ` · 유형: <b>${VEC_CATNAME[r.category] || r.category || "auto"}</b>` + (r.variant && r.variant !== "기본" ? `(${esc(r.variant)})` : "");
+      // 점수는 실제로 측정됐을 때만 표시한다 (node/resvg 없으면 생략)
+      const q = (r.ssim != null) ? ` · 재현도 SSIM <b>${r.ssim}%</b>${r.ink_f1 != null ? ` · 획 보존 <b>${r.ink_f1}%</b>` : ""}` : "";
+      show(box, `<span class="ok">✅ 변환 완료</span> <span class="mono">${kb(r.in_size)} → ${kb(r.out_size)} SVG</span>${ds}${cat}${q} <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
       if (r.preview && r.svg) {
         show($("vecPreview"), `<div class="vecprev-lbl">미리보기 (벡터)</div><div class="vecprev-box">${r.svg}</div>`);
+      } else if (r.preview_png) {
+        // SVG가 커서 인라인 렌더는 위험 → 결과물을 이미지로 렌더해 보여준다(실제 파일은 벡터).
+        show($("vecPreview"), `<div class="vecprev-lbl">미리보기 (변환 결과를 이미지로 렌더)</div><div class="vecprev-box"><img src="${r.preview_png}" style="max-width:100%;display:block;margin:0 auto"></div>`);
       } else {
-        show($("vecPreview"), `<div class="vecprev-lbl">미리보기</div><div class="vecprev-box" style="padding:24px;color:var(--ink-muted)">SVG 용량이 커서 인라인 미리보기는 생략했어요. <b>폴더 열기</b>로 확인하세요. (사진보다 로고·아이콘에서 결과가 깔끔합니다)</div>`);
+        show($("vecPreview"), `<div class="vecprev-lbl">미리보기</div><div class="vecprev-box" style="padding:24px;color:var(--ink-muted)">SVG 용량이 커서 인라인 미리보기는 생략했어요. <b>폴더 열기</b>로 확인하세요.</div>`);
       }
     }
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
@@ -533,21 +581,3 @@ async function cancelVec() {
   $("vecStop").classList.add("hidden");
 }
 
-/* ── 데이터: 대시보드 수정 ── */
-async function pickXlsx() { const p = await api().pick_file("xlsx"); if (p) { XLSX = p; setPath("xlsxPath", p); } }
-async function previewExcel() {
-  if (!XLSX) return alert("엑셀을 선택하세요."); const box = $("excelPreview"); spin(box); show(box);
-  const r = await api().excel_preview($("reqText").value, XLSX);
-  if (r.error) return show(box, `<div class="result"><span class="err">${esc(r.error)}</span></div>`);
-  lastUpdates = r.updates;
-  if (!r.updates.length) return show(box, `<div class="result">감지된 변경이 없습니다.</div>`);
-  const rows = r.updates.map((u) => `<tr><td>${esc(u.sheet_name)}</td><td>${esc(u.item_name)}</td><td>${esc(u.column_name)}</td><td class="to">${esc(u.new_value)}</td></tr>`).join("");
-  show(box, `<div class="pill">엔진: ${esc(r.engine)} · ${r.updates.length}건</div><table class="chg"><tr><th>시트</th><th>항목</th><th>컬럼</th><th>변경값</th></tr>${rows}</table>`);
-}
-async function applyExcel() {
-  if (!XLSX) return alert("엑셀을 선택하세요."); const box = $("excelResult"); spin(box); show(box);
-  const r = await api().excel_apply($("reqText").value, XLSX, lastUpdates);
-  if (r.error) return show(box, `<span class="err">${esc(r.error)}</span>`);
-  const logs = r.logs.map((l) => `<div class="mono">• ${esc(l)}</div>`).join("");
-  show(box, `<span class="ok">✅ 적용 완료 (수식·차트 보존)</span>${logs}<span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
-}
