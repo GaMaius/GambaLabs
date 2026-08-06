@@ -38,9 +38,13 @@ UI 모드(현재): **테마 개발 · PPT 디자인 · 자동 생성 PPT**(+플�
 ### 벡터 변환 (`app/api.py::vectorize` + `src/vector/`)
 비트맵→SVG (visioncortex **vtracer**). 별도 프로세스로 실행 → '중지' 버튼으로 kill 취소.
 - `src/vector/vector_autotune.py` — 분류(**lineart/diagram/logo/photo**) · 유형별 전처리 · 후보 파라미터 생성.
-- `src/vector/quality.py` — 결과 SVG를 resvg로 되-래스터화해 원본과 비교(**SSIM + 잉크 IoU**). node/resvg 없으면 `None` 반환(가짜 점수 금지).
+- `src/vector/quality.py` — 결과 SVG를 resvg로 되-래스터화해 원본과 비교(**SSIM + 획 보존 F1**). node/resvg 없으면 `None` 반환(가짜 점수 금지).
+- `src/vector/svgmin.py` — 좌표 표기 무손실 축소(약 7%). `.` 앞 공백은 절대 지우면 안 됨(`1 .5`→`1.5`로 좌표 소실).
 - `app/ppt/_vtrace_run.py` — job.json을 받아 후보들을 트레이스·채점·최적안 채택. 구버전 positional 호출도 유지.
-- 유형별 핵심: 선화=**그레이 2배 확대+Otsu 이진화 → binary 모드**, 컬러 도식=**2배 확대·색 보존·filter_speckle 2**, 사진=축소+32색.
+- 유형별 핵심: 선화=**그레이 2배 확대+Otsu 이진화 → binary 모드**, 컬러 도식=**BICUBIC 2배 확대·색 보존·filter_speckle 2**, 사진=등배·색 제한 없음·filter_speckle 4.
+- 확대 배율은 `small_mark_ratio`(작은 획 덩어리 비율)로 자동 결정 — 글자 많으면 2배, 큰 면 아이콘은 등배.
+- 확대 보간은 **BICUBIC**. LANCZOS는 오버슈트(링잉)해 획 둘레에 후광을 만든다.
+- 배경 제거 후엔 `defringe_cutout()` 필수 — rembg의 반투명 경계가 검은 윤곽선으로 트레이스된다.
 - **글자 깨짐 3대 원인(수정 완료, 재발 주의)**
   1. `filter_speckle`을 크게 잡으면 `=`·`i`의 점 같은 작은 획이 통째로 사라진다. (옛 코드: 색 수 6000 초과 시 무조건 10으로 올림 → 도식 텍스트 전멸)
   2. `length_threshold`의 vtracer 유효 범위는 **[3.5, 10]**. 범위 밖(옛 코드 1.5) 값은 과분할로 경로를 붕괴시킨다. → `clamp_params()`가 강제.

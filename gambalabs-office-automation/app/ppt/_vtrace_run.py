@@ -106,6 +106,13 @@ def _job(job_path):
         raise SystemExit("all candidates failed: " + json.dumps(tried, ensure_ascii=False))
 
     shutil.move(best["svg"], out)
+    # 좌표 표기 축소(무손실 — 렌더 결과 바이트 동일)
+    try:
+        from src.vector.svgmin import minify_file
+        _b, a = minify_file(out)
+        best["size"] = a
+    except Exception:
+        pass
     for r in tried:
         p = r.pop("svg", None)
         if p and os.path.exists(p):

@@ -666,7 +666,8 @@ class Api:
             work_path = image_path
             if remove_bg:
                 try:
-                    cut = self._remove_bg(tuner.im_pil)
+                    from src.vector.vector_autotune import defringe_cutout
+                    cut = defringe_cutout(self._remove_bg(tuner.im_pil))
                     work_path = os.path.join(tmp_dir, "_vsrc_nobg.png")
                     cut.save(work_path)
                     tuner = VectorAutotuner(work_path)
@@ -777,8 +778,16 @@ class Api:
                 except Exception:
                     pass
 
+            # 사진은 원리상 벡터화가 손해다(원본보다 커지고 화질은 떨어짐). 숨기지 말고 알린다.
+            warn = ""
+            if category == "photo" and out_size > in_size * 2:
+                warn = ("사진은 벡터로 바꾸면 원본보다 파일이 커지고 디테일은 오히려 떨어집니다. "
+                        "발표자료에는 원본 이미지를 그대로 쓰는 편이 낫습니다. "
+                        "용량을 줄이려면 '정밀 자동 튜닝'을 켜거나 수동 설정에서 색 단순화를 쓰세요.")
+
             return {
                 "out": out, "svg": svg, "preview": preview, "preview_png": preview_png,
+                "warn": warn,
                 "removed_bg": removed,
                 "dims": dims, "orig_dims": [prof["w"], prof["h"]],
                 "upscaled": bool(dims and dims[0] > prof["w"]),
@@ -788,7 +797,9 @@ class Api:
                 "variant": best.get("label"),
                 # 채점 불가(node/resvg 없음)면 None — UI에서 표시하지 않는다.
                 "ssim": (round(best["ssim"] * 100, 1) if best.get("ssim") is not None else None),
-                "ink_f1": (round(best["ink_f1"] * 100, 1) if best.get("ink_f1") is not None else None),
+                # 획 보존은 선/글자가 핵심인 유형에서만 의미가 있다. 사진에 붙이면 오해를 부른다.
+                "ink_f1": (round(best["ink_f1"] * 100, 1)
+                           if (METRIC.get(category) == "ink" and best.get("ink_f1") is not None) else None),
                 "tried": [{"label": t.get("label"), "ssim": t.get("ssim"),
                            "ink_f1": t.get("ink_f1"), "size": t.get("size")}
                           for t in report.get("tried", [])],

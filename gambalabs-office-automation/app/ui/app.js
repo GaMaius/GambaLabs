@@ -562,7 +562,8 @@ async function vectorize() {
       const cat = ` · 유형: <b>${VEC_CATNAME[r.category] || r.category || "auto"}</b>` + (r.variant && r.variant !== "기본" ? `(${esc(r.variant)})` : "");
       // 점수는 실제로 측정됐을 때만 표시한다 (node/resvg 없으면 생략)
       const q = (r.ssim != null) ? ` · 재현도 SSIM <b>${r.ssim}%</b>${r.ink_f1 != null ? ` · 획 보존 <b>${r.ink_f1}%</b>` : ""}` : "";
-      show(box, `<span class="ok">✅ 변환 완료</span> <span class="mono">${kb(r.in_size)} → ${kb(r.out_size)} SVG</span>${ds}${cat}${q} <span class="mono">${esc(r.out)}</span><div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
+      const wn = r.warn ? `<div class="warn" style="margin-top:8px">⚠️ ${esc(r.warn)}</div>` : "";
+      show(box, `<span class="ok">✅ 변환 완료</span> <span class="mono">${kb(r.in_size)} → ${kb(r.out_size)} SVG</span>${ds}${cat}${q} <span class="mono">${esc(r.out)}</span>${wn}<div style="margin-top:8px"><button class="btn btn-util" onclick="api().open_folder('${bs(r.out)}')">폴더 열기</button></div>`);
       if (r.preview && r.svg) {
         show($("vecPreview"), `<div class="vecprev-lbl">미리보기 (벡터)</div><div class="vecprev-box">${r.svg}</div>`);
       } else if (r.preview_png) {

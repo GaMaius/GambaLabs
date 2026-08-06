@@ -64,15 +64,18 @@ PRESETS = {
             "splice_threshold": 45, "max_iterations": 10, "path_precision": 3,
         },
     },
-    # 사진·연속 톤: 확대하면 용량만 폭발한다. 축소 + 색 단순화가 정답.
+    # 사진·연속 톤: 확대하면 용량만 폭발하므로 등배~축소.
+    # 격자 탐색 결과 filter_speckle 4 · 색 제한 없음 · bilateral 없음이 확실히 우세했다
+    # (파인애플.webp 기준 score 0.816 → 0.877). 용량을 줄이려면 autotune 변형을 쓴다.
     "photo": {
-        "upscale": 1.0, "binarize": False, "quantize": 32, "cap": 1400,
+        "upscale": 1.0, "binarize": False, "quantize": 0, "cap": 1400,
         "params": {
             "colormode": "color", "hierarchical": "stacked", "mode": "spline",
-            "filter_speckle": 8, "color_precision": 7, "layer_difference": 16,
+            "filter_speckle": 4, "color_precision": 8, "layer_difference": 16,
             "corner_threshold": 60, "length_threshold": 4.0,
             "splice_threshold": 45, "max_iterations": 10, "path_precision": 3,
         },
+        "denoise": 0,   # bilateral 커널 지름(0=사용 안 함)
     },
 }
 
@@ -92,9 +95,11 @@ _VARIANTS = {
         {"label": "잡티최소", "params": {"filter_speckle": 2}},
         {"label": "24색", "quantize": 24},
     ],
+    # 사진은 기본이 가장 정확하지만 용량이 크다 — 아래는 용량을 줄이는 쪽 후보들.
     "photo": [
-        {"label": "16색", "quantize": 16, "params": {"filter_speckle": 12}},
         {"label": "64색", "quantize": 64},
+        {"label": "32색", "quantize": 32},
+        {"label": "잡티강", "params": {"filter_speckle": 10}},
     ],
 }
 
@@ -118,6 +123,23 @@ def flatten_on_white(im):
     im = im.convert("RGBA")
     bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
     return Image.alpha_composite(bg, im).convert("RGB")
+
+
+def defringe_cutout(im: Image.Image, erode_px: int = 1) -> Image.Image:
+    """배경 제거 결과의 반투명 테두리를 잘라낸다.
+
+    rembg가 남기는 경계 픽셀은 피사체 색과 원래 배경색이 섞여 있다. 그대로 트레이스하면
+    윤곽을 따라 검은 실선/점선이 생긴다. 알파를 이진화하고 1px 깎아 오염된 띠를 버린다.
+    """
+    a = np.array(im.convert("RGBA"))
+    alpha = a[:, :, 3]
+    if not np.any((alpha > 0) & (alpha < 250)):
+        return im   # 이미 하드 엣지면 손대지 않는다
+    m = (alpha >= 128).astype(np.uint8)
+    if erode_px > 0:
+        m = cv2.erode(m, np.ones((3, 3), np.uint8), iterations=int(erode_px))
+    a[:, :, 3] = m * 255
+    return Image.fromarray(a, "RGBA")
 
 
 class VectorAutotuner:
@@ -261,11 +283,11 @@ class VectorAutotuner:
 
         im = self.im_pil  # RGBA (투명 보존 — RGB로 바꾸면 투명이 검정이 된다)
 
-        if cat == "photo":
-            # 사진은 미세 노이즈가 그대로 수천 개의 조각 패스가 된다. 엣지 보존 평활화로 정리.
+        d = int(pr.get("denoise", 0))
+        if d:
+            # 엣지 보존 평활화. 용량은 줄지만 실측상 재현도는 조금 떨어져 기본은 꺼 둔다.
             arr = np.array(im)
-            rgbf = cv2.bilateralFilter(arr[:, :, :3], 7, 45, 45)
-            arr = np.dstack([rgbf, arr[:, :, 3]])
+            arr = np.dstack([cv2.bilateralFilter(arr[:, :, :3], d, 45, 45), arr[:, :, 3]])
             im = Image.fromarray(arr, "RGBA")
 
         if (tw, th) != im.size:
