@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1150" height="720" viewBox="0 0 1150 720" font-family="Malgun Gothic, 맑은 고딕, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#8A97A8"/>
+    </marker>
+  </defs>
+
+  <!-- 사용자 UI -->
+  <rect x="30" y="20" width="1090" height="112" rx="10" fill="#F2F5FA" stroke="#DCE4EF" stroke-width="1.5"/>
+  <text x="58" y="66" font-size="30" font-weight="bold" fill="#123979">사용자 UI</text>
+  <text x="58" y="102" font-size="21" fill="#5A6472">pywebview 데스크톱 앱 · HTML · CSS · JS</text>
+  <rect x="630" y="51" width="150" height="50" rx="25" fill="#FFFFFF" stroke="#123979" stroke-width="2"/>
+  <text x="705" y="83" font-size="22" font-weight="bold" fill="#123979" text-anchor="middle">PPT</text>
+  <rect x="800" y="51" width="150" height="50" rx="25" fill="#FFFFFF" stroke="#2A9D99" stroke-width="2"/>
+  <text x="875" y="83" font-size="22" font-weight="bold" fill="#22857F" text-anchor="middle">Excel</text>
+  <rect x="970" y="51" width="150" height="50" rx="25" fill="#FFFFFF" stroke="#4E86C6" stroke-width="2"/>
+  <text x="1045" y="83" font-size="22" font-weight="bold" fill="#3C74B4" text-anchor="middle">SVG 변환</text>
+
+  <line x1="575" y1="132" x2="575" y2="162" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- 제어 계층 -->
+  <rect x="30" y="168" width="1090" height="96" rx="10" fill="#0038A3"/>
+  <text x="58" y="212" font-size="27" font-weight="bold" fill="#FFFFFF">제어 계층<tspan dx="16" font-size="23" font-family="Consolas, monospace">app/api.py</tspan></text>
+  <text x="58" y="245" font-size="21" fill="#C3D3EE">JS ↔ Python 브리지 · 요청 라우팅 · 사람 확인 게이트</text>
+
+  <line x1="205" y1="264" x2="205" y2="298" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+  <line x1="575" y1="264" x2="575" y2="298" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+  <line x1="945" y1="264" x2="945" y2="298" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- 기능 3축 -->
+  <rect x="30" y="304" width="350" height="256" rx="10" fill="#F8FAFD" stroke="#DCE4EF" stroke-width="1.5"/>
+  <rect x="30" y="304" width="350" height="7" rx="3" fill="#123979"/>
+  <text x="58" y="352" font-size="25" font-weight="bold" fill="#123979">PPT</text>
+  <text x="58" y="396" font-size="21" fill="#3C4756">• 테마 제작 · 저장</text>
+  <text x="58" y="432" font-size="21" fill="#3C4756">• 러프 PPT 재설계</text>
+  <text x="58" y="468" font-size="21" fill="#3C4756">• 문서 → 덱 자동 생성</text>
+  <text x="58" y="504" font-size="21" fill="#3C4756">• 외부 LLM용 프롬프트</text>
+  <text x="72" y="534" font-size="19" fill="#8A97A8">app/ppt/</text>
+
+  <rect x="400" y="304" width="350" height="256" rx="10" fill="#F8FAFD" stroke="#DCE4EF" stroke-width="1.5"/>
+  <rect x="400" y="304" width="350" height="7" rx="3" fill="#2A9D99"/>
+  <text x="428" y="352" font-size="25" font-weight="bold" fill="#22857F">Excel</text>
+  <text x="428" y="396" font-size="21" fill="#3C4756">• 실험 결과 자동 기록</text>
+  <text x="428" y="432" font-size="21" fill="#3C4756">• 데이터 분석 · 차트</text>
+  <text x="428" y="468" font-size="21" fill="#3C4756">• 영수증 자동 작성</text>
+  <text x="428" y="504" font-size="21" fill="#3C4756">• 수식 · 차트 보존 수정</text>
+  <text x="442" y="534" font-size="19" fill="#8A97A8">src/excel/</text>
+
+  <rect x="770" y="304" width="350" height="256" rx="10" fill="#F8FAFD" stroke="#DCE4EF" stroke-width="1.5"/>
+  <rect x="770" y="304" width="350" height="7" rx="3" fill="#4E86C6"/>
+  <text x="798" y="352" font-size="25" font-weight="bold" fill="#3C74B4">SVG 변환</text>
+  <text x="798" y="396" font-size="21" fill="#3C4756">• 비트맵 → 벡터 변환</text>
+  <text x="798" y="432" font-size="21" fill="#3C4756">• 유형별 자동 튜닝</text>
+  <text x="798" y="468" font-size="21" fill="#3C4756">• 품질 점수로 최적안 채택</text>
+  <text x="798" y="504" font-size="21" fill="#3C4756">• 배경 제거</text>
+  <text x="812" y="534" font-size="19" fill="#8A97A8">src/vector/</text>
+
+  <line x1="205" y1="560" x2="205" y2="594" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+  <line x1="575" y1="560" x2="575" y2="594" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+  <line x1="945" y1="560" x2="945" y2="594" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- 공통 백엔드 -->
+  <rect x="30" y="600" width="1090" height="96" rx="10" fill="#123979"/>
+  <text x="58" y="644" font-size="27" font-weight="bold" fill="#FFFFFF">공통 백엔드</text>
+  <text x="58" y="677" font-size="21" fill="#C3D3EE">LLM 통합 클라이언트 (Groq · Ollama · OpenAI) · Node 렌더러 (pptxgenjs · resvg) · Pillow 이미지</text>
+</svg>

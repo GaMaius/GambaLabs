@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1150" height="560" viewBox="0 0 1150 560" font-family="Malgun Gothic, 맑은 고딕, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#9FB0A9"/>
+    </marker>
+  </defs>
+
+  <!-- ① 실험 결과 자동 기록 -->
+  <rect x="30" y="20" width="350" height="424" rx="10" fill="#FFFFFF" stroke="#D5DAE2" stroke-width="1.5"/>
+  <path d="M30 30 a10 10 0 0 1 10 -10 h330 a10 10 0 0 1 10 10 v46 h-350 z" fill="#2A9D99"/>
+  <text x="54" y="62" font-size="23" font-weight="bold" fill="#FFFFFF">실험 결과 자동 기록</text>
+  <text x="54" y="112" font-size="18" font-weight="bold" fill="#9AA7B4">입력</text>
+  <text x="54" y="142" font-size="20" fill="#3C4756">실험 스크립트에</text>
+  <text x="54" y="168" font-size="20" fill="#3C4756">로거 한 줄 추가</text>
+  <line x1="205" y1="184" x2="205" y2="206" stroke="#9FB0A9" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="54" y="238" font-size="18" font-weight="bold" fill="#9AA7B4">처리</text>
+  <text x="54" y="268" font-size="20" fill="#3C4756">결과값 파싱 ·</text>
+  <text x="54" y="294" font-size="20" fill="#3C4756">차트 열 자동 감지</text>
+  <line x1="205" y1="310" x2="205" y2="332" stroke="#9FB0A9" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="54" y="364" font-size="18" font-weight="bold" fill="#9AA7B4">결과</text>
+  <text x="54" y="394" font-size="20" font-weight="bold" fill="#22857F">트래커 엑셀에 누적</text>
+  <text x="54" y="420" font-size="20" font-weight="bold" fill="#22857F">+ 차트 자동 갱신</text>
+
+  <!-- ② 데이터 분석 · 차트 -->
+  <rect x="400" y="20" width="350" height="424" rx="10" fill="#FFFFFF" stroke="#D5DAE2" stroke-width="1.5"/>
+  <path d="M400 30 a10 10 0 0 1 10 -10 h330 a10 10 0 0 1 10 10 v46 h-350 z" fill="#2A9D99"/>
+  <text x="424" y="62" font-size="23" font-weight="bold" fill="#FFFFFF">데이터 분석 · 차트</text>
+  <text x="424" y="112" font-size="18" font-weight="bold" fill="#9AA7B4">입력</text>
+  <text x="424" y="142" font-size="20" fill="#3C4756">기존 엑셀 파일</text>
+  <text x="424" y="168" font-size="19" fill="#8A97A8">헤더가 1행이 아니어도 됨</text>
+  <line x1="575" y1="184" x2="575" y2="206" stroke="#9FB0A9" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="424" y="238" font-size="18" font-weight="bold" fill="#9AA7B4">처리</text>
+  <text x="424" y="268" font-size="20" fill="#3C4756">pandas 로드 → LLM이</text>
+  <text x="424" y="294" font-size="20" fill="#3C4756">요약 · 추세 · 이상치</text>
+  <line x1="575" y1="310" x2="575" y2="332" stroke="#9FB0A9" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="424" y="364" font-size="18" font-weight="bold" fill="#9AA7B4">결과</text>
+  <text x="424" y="394" font-size="20" font-weight="bold" fill="#22857F">분석 시트 + 차트</text>
+  <text x="424" y="420" font-size="20" font-weight="bold" fill="#22857F">생성</text>
+
+  <!-- ③ 영수증 자동 작성 -->
+  <rect x="770" y="20" width="350" height="424" rx="10" fill="#FFFFFF" stroke="#D5DAE2" stroke-width="1.5"/>
+  <path d="M770 30 a10 10 0 0 1 10 -10 h330 a10 10 0 0 1 10 10 v46 h-350 z" fill="#2A9D99"/>
+  <text x="794" y="62" font-size="23" font-weight="bold" fill="#FFFFFF">영수증 자동 작성</text>
+  <text x="794" y="112" font-size="18" font-weight="bold" fill="#9AA7B4">입력</text>
+  <text x="794" y="142" font-size="20" fill="#3C4756">자연어로 적은</text>
+  <text x="794" y="168" font-size="20" fill="#3C4756">결제 내역</text>
+  <line x1="945" y1="184" x2="945" y2="206" stroke="#9FB0A9" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="794" y="238" font-size="18" font-weight="bold" fill="#9AA7B4">처리</text>
+  <text x="794" y="268" font-size="20" fill="#3C4756">LLM이 항목 · 금액 ·</text>
+  <text x="794" y="294" font-size="20" fill="#3C4756">날짜를 구조화</text>
+  <line x1="945" y1="310" x2="945" y2="332" stroke="#9FB0A9" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="794" y="364" font-size="18" font-weight="bold" fill="#9AA7B4">결과</text>
+  <text x="794" y="394" font-size="20" font-weight="bold" fill="#22857F">사내 표준 양식에</text>
+  <text x="794" y="420" font-size="20" font-weight="bold" fill="#22857F">채움 (합계 수식 유지)</text>
+
+  <!-- 공통 원칙 -->
+  <rect x="30" y="464" width="1090" height="76" rx="10" fill="#F1F8F7" stroke="#BFDEDB" stroke-width="1.5"/>
+  <rect x="30" y="464" width="7" height="76" rx="3" fill="#2A9D99"/>
+  <text x="58" y="500" font-size="21" font-weight="bold" fill="#22857F">세 기능의 공통 원칙</text>
+  <text x="58" y="528" font-size="19" fill="#3C4756">openpyxl을 data_only=False로 열어 기존 수식 · 차트 · 서식을 보존한 채 대상 셀만 고친다 (적용 전 사람이 확인)</text>
+</svg>

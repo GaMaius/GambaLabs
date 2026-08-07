@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1150" height="952" viewBox="0 0 1150 952" font-family="Malgun Gothic, 맑은 고딕, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#8A97A8"/>
+    </marker>
+    <marker id="aL" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#D2762B"/>
+    </marker>
+  </defs>
+
+  <!-- 입력 -->
+  <rect x="30" y="20" width="1090" height="72" rx="10" fill="#F2F5FA" stroke="#DCE4EF" stroke-width="1.5"/>
+  <text x="58" y="64" font-size="24" font-weight="bold" fill="#123979">입력 이미지</text>
+  <text x="216" y="64" font-size="22" fill="#3C4756">PNG · JPG · WebP · HEIC · AVIF  (비트맵 — 해상도 고정)</text>
+  <line x1="575" y1="92" x2="575" y2="120" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- ① rembg -->
+  <rect x="30" y="126" width="1090" height="132" rx="10" fill="#FFFFFF" stroke="#D5DAE2" stroke-width="1.5"/>
+  <path d="M30 136 a10 10 0 0 1 10 -10 h1070 a10 10 0 0 1 10 10 v48 h-1090 z" fill="#2E6FB7"/>
+  <circle cx="62" cy="160" r="16" fill="#FFFFFF" fill-opacity="0.24"/>
+  <text x="62" y="168" font-size="19" font-weight="bold" fill="#FFFFFF" text-anchor="middle">1</text>
+  <text x="90" y="169" font-size="26" font-weight="bold" fill="#FFFFFF">rembg<tspan dx="16" font-size="20" font-weight="normal" fill="#D6E4F5">배경 제거 · 선택 단계 · Python · ONNX</tspan></text>
+  <text x="58" y="222" font-size="22" fill="#3C4756">U²-Net 세그멘테이션으로 피사체만 남기고 투명 처리 · 반투명 경계는 자체 보정(검은 윤곽선 방지)</text>
+  <line x1="575" y1="258" x2="575" y2="286" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- ② vtracer -->
+  <rect x="30" y="292" width="1090" height="164" rx="10" fill="#FFFFFF" stroke="#0038A3" stroke-width="2.5"/>
+  <path d="M30 302 a10 10 0 0 1 10 -10 h1070 a10 10 0 0 1 10 10 v50 h-1090 z" fill="#0038A3"/>
+  <circle cx="62" cy="327" r="16" fill="#FFFFFF" fill-opacity="0.24"/>
+  <text x="62" y="335" font-size="19" font-weight="bold" fill="#FFFFFF" text-anchor="middle">2</text>
+  <text x="90" y="336" font-size="26" font-weight="bold" fill="#FFFFFF">vtracer<tspan dx="16" font-size="20" font-weight="normal" fill="#CBDBF5">변환 엔진 · visioncortex · Rust · Python 바인딩</tspan></text>
+  <rect x="1012" y="308" width="80" height="32" rx="16" fill="#FFFFFF" fill-opacity="0.24"/>
+  <text x="1052" y="331" font-size="19" font-weight="bold" fill="#FFFFFF" text-anchor="middle">핵심</text>
+  <text x="58" y="392" font-size="22" fill="#3C4756">색 레이어별로 윤곽을 따내 곡선(spline) 경로로 변환 · 유형별 파라미터는 자체 지정</text>
+  <text x="58" y="428" font-size="22" fill="#3C4756">별도 프로세스에서 실행 → 중지 버튼으로 즉시 취소</text>
+  <line x1="575" y1="456" x2="575" y2="484" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- ③ resvg -->
+  <rect x="30" y="490" width="1090" height="164" rx="10" fill="#FFFFFF" stroke="#D5DAE2" stroke-width="1.5"/>
+  <path d="M30 500 a10 10 0 0 1 10 -10 h1070 a10 10 0 0 1 10 10 v48 h-1090 z" fill="#4A8FD4"/>
+  <circle cx="62" cy="524" r="16" fill="#FFFFFF" fill-opacity="0.24"/>
+  <text x="62" y="532" font-size="19" font-weight="bold" fill="#FFFFFF" text-anchor="middle">3</text>
+  <text x="90" y="533" font-size="26" font-weight="bold" fill="#FFFFFF">resvg<tspan dx="16" font-size="20" font-weight="normal" fill="#E1EDFA">품질 검증 · 채점 · Rust · Node 바인딩</tspan></text>
+  <text x="58" y="588" font-size="22" fill="#3C4756">결과 SVG를 다시 PNG로 렌더해 원본과 비교 · SSIM + 획 보존율로 채점</text>
+  <text x="58" y="624" font-size="20" fill="#8A97A8">픽셀 지표만으로는 글자 하나가 사라져도 점수가 안 움직여, 획 덩어리 단위로 함께 센다</text>
+
+  <!-- 자동 튜닝 -->
+  <rect x="30" y="668" width="1090" height="70" rx="10" fill="#FDF3E9" stroke="#EBC49A" stroke-width="2"/>
+  <text x="58" y="700" font-size="22" font-weight="bold" fill="#B45F17">↻  자동 튜닝<tspan dx="14" font-size="21" font-weight="normal" fill="#8A5A2B">②~③을 후보 3~4개에 대해 반복한다</tspan></text>
+  <text x="58" y="728" font-size="20" fill="#8A5A2B">점수가 가장 높은 결과를 채택 · 점수가 사실상 같으면 파일이 작은 쪽을 고른다</text>
+  <line x1="575" y1="738" x2="575" y2="766" stroke="#8A97A8" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- 출력 -->
+  <rect x="30" y="772" width="1090" height="76" rx="10" fill="#123979"/>
+  <text x="58" y="806" font-size="24" font-weight="bold" fill="#FFFFFF">최적안 SVG</text>
+  <text x="58" y="836" font-size="20" fill="#C9D6EC">해상도 무손실 · 좌표 표기 무손실 축소로 용량 약 7% 절감 · PPT와 문서에 바로 삽입</text>
+
+  <!-- 자체 구현 -->
+  <rect x="30" y="866" width="1090" height="66" rx="10" fill="#F5F8FC" stroke="#DCE4EF" stroke-width="1.5"/>
+  <rect x="30" y="866" width="7" height="66" rx="3" fill="#123979"/>
+  <text x="58" y="908" font-size="21" font-weight="bold" fill="#123979">자체 구현<tspan dx="14" font-size="20" font-weight="normal" fill="#5A6472">유형 자동 분류 · 유형별 전처리 · 후보 파라미터 생성 · 점수 비교 채택 · 프로세스 격리</tspan></text>
+</svg>
