@@ -7,6 +7,7 @@ vtracer
 opencv-python>=4.8.0
 numpy>=1.24.0
 scikit-image>=0.22.0
+pypdfium2   # 덱을 이미지로 렌더해 눈으로 검증(LibreOffice와 함께)
 pillow-heif
 pillow-avif-plugin
 rembg[cpu]

@@ -61,6 +61,18 @@ UI 모드(현재): **테마 개발 · PPT 디자인 · 자동 생성 PPT**(+플�
 - 렌더 자동 글자크기: `render_deck.js`의 `fitSize`/`fitList`가 박스에 맞게 폰트 계산(오버플로 방지).
 - 신규 레이아웃: `metrics`(지표 카드), `compare`(2열+도넛), 막대+추세선(`chart.trend`), 그라데이션(`gradient.py`).
 
+## 3-1. 덱을 눈으로 보기 (중요) — `app/ppt/deck_render.py`, `app/ppt/deck_lint.py`
+LibreOffice 설치 완료(`C:\Program Files\LibreOffice\program\soffice.exe`) + `pypdfium2`.
+- `deck_render.to_images(pptx, out_dir)` → pptx→pdf→png. **작업 후 반드시 렌더해서 눈으로 볼 것.**
+  구조(python-pptx)만 검사하면 "들어갔는데 보기엔 엉망"을 못 잡는다(사진이 카드에 가려짐, 파이가 전부 같은 파랑 등 실제로 놓쳤다).
+- `deck_lint.lint(pptx, expect)` → 기하 결함(화면 밖·사진 가려짐·겹침·빈 슬라이드·헤더 없음)과
+  기획 대비 누락(차트 슬라이드에 실제 차트 없음, 배치돼야 할 사진 없음)을 문자열 목록으로.
+- freeform 자유 설계는 이 둘로 자가 검증한다: 코드 생성 → 실행(실패 시 에러 주고 재작성) →
+  lint(결함 있으면 지적하고 재작성) → 3회차에도 남으면 **템플릿으로 폴백**.
+- ⚠️ 실측: llama-3.3-70b는 pptxgenjs 자유 생성 품질이 템플릿보다 나쁘다(표지 공백·글자 겹침·
+  차트를 회색 네모+숫자로 흉내). 자유 설계를 실효화하려면 코딩 강한 모델(GPT-4o급)이 필요.
+  `PPT_FREE_LAYOUT=0`으로 자유 설계를 끌 수 있다.
+
 ## 4. LLM 백엔드 — `src/common/llm_client.py` 및 `.env` (gitignore됨)
 - **Groq (GPT OSS - Llama 3.3 70B, Qwen 2.5 32B, DeepSeek R1)** / **Ollama** / **OpenAI** 3원 통합 팩토리.
 - `LLM_PROVIDER=groq|ollama|openai` 설정 또는 `GROQ_API_KEY` 유무로 자동 감지.

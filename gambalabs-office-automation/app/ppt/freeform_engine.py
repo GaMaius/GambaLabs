@@ -422,12 +422,15 @@ def _convert_plan_to_js(plan: dict) -> str:
 
 def generate_freeform(doc_text: str, out_pptx: str, assets_dir: str = DEFAULT_ASSETS,
                       theme: str = None, theme_config: dict = None, brief: str = "",
-                      user_images: dict = None) -> str:
+                      user_images: dict = None, free_layout: bool = None) -> str:
     """LLM 2단계 생성 (1단계: 문서 분석 & 슬라이드 기획 -> 2단계: 헬퍼 기반 JS 실행).
 
     user_images: {입력 슬라이드 번호: [이미지 경로, ...]} — 러프 PPT에 사용자가 직접 넣은 사진.
     """
     theme_info = _resolve_theme(theme, theme_config)
+    if free_layout is None:
+        # PPT_FREE_LAYOUT=0 으로 끄면 예전 템플릿 경로만 쓴다.
+        free_layout = (os.getenv("PPT_FREE_LAYOUT", "1").strip().lower() not in ("0", "false", "off"))
 
     media_note = ""
     if user_images:
@@ -445,49 +448,234 @@ def generate_freeform(doc_text: str, out_pptx: str, assets_dir: str = DEFAULT_AS
     # 이미지·그라데이션 지시를 실제 파일로 해결
     plan = _resolve_media(plan, theme_info, user_images)
 
-    print(f"[freeform_engine] 2단계: pptxgenjs 코드 생성 및 렌더링 중…")
-    js_content = _convert_plan_to_js(plan)
-
     os.makedirs(os.path.dirname(os.path.abspath(out_pptx)), exist_ok=True)
 
-    assets_clean = assets_dir.replace('\\', '/')
-    theme_json = json.dumps(theme_info, ensure_ascii=False)
-    
-    header_inject = f"""
+    # 2단계: 모델이 슬라이드마다 코드를 직접 쓰게 한다(자유 설계).
+    # 실행 실패·기하 결함은 지적해서 다시 쓰게 하고, 끝내 안 되면 템플릿 경로로 폴백한다.
+    if free_layout:
+        try:
+            ok = _generate_by_code(plan, out_pptx, assets_dir, theme_info, brief)
+            if ok:
+                print(f"[freeform_engine] 생성 완료(자유 설계): {out_pptx}")
+                return out_pptx
+        except Exception as e:
+            print(f"[freeform_engine] 자유 설계 실패 → 템플릿 폴백: {e}")
+
+    print(f"[freeform_engine] 2단계: 템플릿 레이아웃으로 렌더 중…")
+    js_content = _convert_plan_to_js(plan)
+    _run_js(js_content, out_pptx, assets_dir, theme_info, _media_maps(plan))
+    print(f"[freeform_engine] 생성 완료: {out_pptx}")
+    return out_pptx
+
+
+def _media_maps(plan: dict) -> tuple:
+    """기획안에서 슬라이드 번호 → 이미지/그라데이션 경로 맵을 뽑는다."""
+    img, grad = {}, {}
+    for i, sl in enumerate(plan.get("slides", []), 1):
+        p = (sl.get("image") or {}).get("path") if isinstance(sl.get("image"), dict) else None
+        if p:
+            img[str(i)] = p
+        gp = (sl.get("gradient") or {}).get("path") if isinstance(sl.get("gradient"), dict) else None
+        if gp:
+            grad[str(i)] = gp
+    return img, grad
+
+
+def _run_js(js_body: str, out_pptx: str, assets_dir: str, theme_info: dict,
+            media: tuple = None, timeout: int = 90):
+    """헬퍼·테마·미디어 경로를 주입해 pptxgenjs 코드를 실행. 실패하면 RuntimeError(stderr)."""
+    img_map, grad_map = media or ({}, {})
+    header = f"""
 var path = require("path");
 var pptxgen = require("pptxgenjs");
-var THEME_INFO = {theme_json};
-var ASSETS_DIR = "{assets_clean}";
+var THEME_INFO = {json.dumps(theme_info, ensure_ascii=False)};
+var ASSETS_DIR = {json.dumps(assets_dir.replace(chr(92), '/'))};
 var A = function(p) {{ return path.resolve(ASSETS_DIR, p); }};
+var IMG = {json.dumps(img_map, ensure_ascii=False)};
+var GRAD = {json.dumps(grad_map, ensure_ascii=False)};
 {_HELPERS_CODE}
 var prs = new pptxgen();
 prs.layout = "LAYOUT_WIDE";
 """
-    full_js = header_inject + "\n" + js_content
-
     tmp_dir = os.path.join(PROJECT_DIR, "output", "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", suffix=".js", dir=tmp_dir, delete=False, encoding="utf-8") as tf:
-        tf.write(full_js)
+        tf.write(header + "\n" + js_body)
         js_path = tf.name
-
     try:
-        res = subprocess.run(
-            ["node", js_path, out_pptx],
-            capture_output=True, text=True, cwd=PROJECT_DIR, timeout=60
-        )
+        if os.path.exists(out_pptx):
+            os.remove(out_pptx)
+        res = subprocess.run(["node", js_path, out_pptx], capture_output=True, text=True,
+                             cwd=PROJECT_DIR, timeout=timeout)
         if res.returncode != 0:
-            err_msg = (res.stderr or "")[-800:]
-            raise RuntimeError(f"pptxgenjs 코드 실행 실패:\n{err_msg}")
+            raise RuntimeError((res.stderr or res.stdout or "")[-1200:])
         if not os.path.exists(out_pptx):
-            raise RuntimeError("pptxgenjs 코드가 .pptx 파일을 생성하지 않음")
-        print(f"[freeform_engine] 생성 완료: {out_pptx}")
-        return out_pptx
+            raise RuntimeError("코드가 .pptx 파일을 만들지 않았다(prs.writeFile 누락?)")
     finally:
         try:
             os.unlink(js_path)
         except OSError:
             pass
+
+
+def _generate_by_code(plan: dict, out_pptx: str, assets_dir: str,
+                      theme_info: dict, brief: str = "", max_rounds: int = 3) -> bool:
+    """모델이 pptxgenjs 코드를 직접 쓰고, 실행·기하 검사 결과로 고쳐 쓴다."""
+    from src.common.llm_client import get_llm_client_and_model
+    from app.ppt import deck_lint
+    client, model_name = get_llm_client_and_model()
+    media = _media_maps(plan)
+    slides = plan.get("slides", [])
+    expect = {
+        "n_slides": len(slides),
+        "cover": bool(slides) and (slides[0].get("layout_type") == "cover"),
+        "charts": [i for i, sl in enumerate(slides, 1)
+                   if sl.get("layout_type") == "chart" and sl.get("chartData")],
+        "images": [i for i, sl in enumerate(slides, 1)
+                   if isinstance(sl.get("image"), dict) and sl["image"].get("path")],
+    }
+
+    prompt = _code_prompt(plan, assets_dir, theme_info, brief)
+    messages = [
+        {"role": "system", "content": "You are an expert pptxgenjs developer and presentation designer. Output only runnable JavaScript."},
+        {"role": "user", "content": prompt},
+    ]
+
+    for rnd in range(1, max_rounds + 1):
+        resp = client.chat.completions.create(model=model_name, temperature=0.2, messages=messages)
+        raw = resp.choices[0].message.content or ""
+        try:
+            js = _extract_js_body(raw)
+        except ValueError as e:
+            messages += [{"role": "assistant", "content": raw[:2000]},
+                         {"role": "user", "content": f"코드를 못 찾았다({e}). 설명 없이 JS 코드만 다시 출력하라."}]
+            continue
+
+        try:
+            _run_js(js, out_pptx, assets_dir, theme_info, media)
+        except Exception as e:
+            print(f"[freeform_engine] 자유 설계 {rnd}회차 실행 실패 → 재작성 요청")
+            messages += [{"role": "assistant", "content": js[:6000]},
+                         {"role": "user", "content":
+                          f"위 코드가 실행 중 실패했다:\n{e}\n\n원인을 고쳐 전체 코드를 다시 출력하라. 설명 없이 코드만."}]
+            continue
+
+        problems = deck_lint.lint(out_pptx, expect)
+        if not problems:
+            print(f"[freeform_engine] 자유 설계 {rnd}회차 통과(기하 검사 이상 없음)")
+            return True
+        if rnd == max_rounds:
+            # 끝까지 결함이 남으면 채택하지 않는다. 검증 안 된 자유 설계보다
+            # 안정적인 템플릿 결과가 낫다(실측으로 확인됨).
+            print(f"[freeform_engine] 자유 설계 잔여 결함 {len(problems)}건 → 템플릿으로 폴백")
+            for p in problems[:6]:
+                print("   ·", p)
+            return False
+
+        print(f"[freeform_engine] 자유 설계 {rnd}회차 기하 결함 {len(problems)}건 → 수정 요청")
+        messages += [{"role": "assistant", "content": js[:6000]},
+                     {"role": "user", "content":
+                      "생성된 덱을 검사하니 아래 문제가 있다. 해당 슬라이드의 좌표·크기를 고쳐 "
+                      "전체 코드를 다시 출력하라. 설명 없이 코드만.\n- " + "\n- ".join(problems)}]
+    return False
+
+
+def _code_prompt(plan: dict, assets_dir: str, theme_info: dict, brief: str = "") -> str:
+    """모델이 슬라이드마다 직접 코드를 쓰게 하는 프롬프트."""
+    C = theme_info.get("C", {})
+    F = theme_info.get("F", {})
+    use_images = theme_info.get("useImages", True)
+
+    # 기획안에서 이미 확정된 미디어 경로를 그대로 보여준다(모델이 경로를 지어내지 않도록)
+    media_lines = []
+    for i, sl in enumerate(plan.get("slides", []), 1):
+        img = sl.get("image") or {}
+        g = sl.get("gradient") or {}
+        if isinstance(img, dict) and img.get("path"):
+            media_lines.append(
+                f'  슬라이드 {i} 사진: IMG[{i}]  (mode={img.get("mode", "region")}'
+                + (f', 투명도 {img.get("transparency")}%' if img.get("transparency") else "") + ")")
+        if isinstance(g, dict) and g.get("path"):
+            media_lines.append(f"  슬라이드 {i} 그라데이션 패널: GRAD[{i}]")
+    media_block = ("\n[이 덱에서 쓸 수 있는 이미지 — 반드시 이 변수만 써라. 경로를 새로 지어내지 마라]\n"
+                   + "\n".join(media_lines) + "\n") if media_lines else ""
+
+    asset_block = ""
+    if use_images:
+        asset_block = (
+            "\n[브랜드 에셋]\n"
+            '  A("backgrounds/bg_cover.png") — 표지 배경\n'
+            '  A("backgrounds/band.png") — 본문 상단 헤더 밴드(0,0,13.333,1.05)\n'
+            '  A("logo/icon_white.png"), A("logo/logo_white.png"), A("logo/logo_color.png")\n')
+
+    brief_block = f"\n[제작자 브리프]\n{brief[:4000]}\n" if (brief or "").strip() else ""
+
+    return f"""너는 발표자료 디자이너이자 pptxgenjs 개발자다.
+아래 [기획안]을 슬라이드별로 **직접 코드를 써서** 배치하라. 정해진 틀에 끼워 맞추지 말고,
+각 슬라이드의 내용 분량과 성격에 맞는 배치를 그 자리에서 설계하라.
+
+[캔버스 · 그리드]
+- 슬라이드는 13.333 x 7.5 인치. 상단 1.05인치는 헤더 밴드 영역이다(본문은 y >= 1.25부터).
+- 좌우 여백 0.8인치를 지켜라. 즉 본문 가용 폭은 x 0.8 ~ 12.53.
+- 요소 간 간격은 0.3~0.5인치. 요소가 슬라이드 밖으로 나가면 안 된다.
+
+[타이포]
+- 슬라이드 제목 24~30pt bold, 소제목 16~20pt bold, 본문 12~15pt, 캡션 10~11pt.
+- 큰 수치 강조는 36~54pt bold. 본문은 왼쪽 정렬(제목만 가운데 허용).
+- 글자가 넘치지 않게 상자 크기를 넉넉히 잡아라. 한 상자에 5줄 이상 넣지 마라.
+
+[색 — 반드시 이 값만 써라]
+const C = {json.dumps(C, ensure_ascii=False)};
+const F = {json.dumps(F, ensure_ascii=False)};
+- 색은 '#' 없이 6자리 문자열. 배경 위 글자는 대비를 확인해서 골라라(어두운 배경엔 C.white).
+{asset_block}{media_block}
+[쓸 수 있는 헬퍼 — 써도 되고 직접 그려도 된다]
+  addHeader(s, "제목", THEME_INFO, ASSETS_DIR)             상단 밴드 + 제목
+  addCover(prs, "제목", "부제", "발표자", THEME_INFO, ASSETS_DIR)
+  addChart(s, "제목", chartData, THEME_INFO, prs, rect)     rect={{x,y,w,h}}
+  addSlideImage(s, imgPath, {{mode,transparency,x,y,w,h}})
+  addGradientPanel(s, gradPath, {{x,y,w,h}})
+  fitText(text, wIn, hIn, base, min) → 글자 크기 계산
+표지는 addCover, 본문 상단은 addHeader를 쓰는 게 안전하다. 그 아래 본문은 직접 설계하라.
+
+[반드시 지킬 것]
+- 사진이 있는 슬라이드는 **사진 자리를 비워라.** 카드·도형이 사진을 덮으면 안 된다.
+- 그라데이션 패널은 콘텐츠보다 **먼저** 그려라(나중에 그리면 내용을 덮는다).
+- 도형 타입은 문자열로: s.addShape('roundRect', ...) / 'rect'. pptxgen.ShapeType 접근 금지.
+- rectRadius는 roundRect에서만. 그림자 offset >= 0.
+- CSS 그라데이션 채움을 쓰지 마라(pptxgenjs 미지원). 그라데이션은 addGradientPanel만.
+- 슬라이드 개수는 기획안과 같게. 내용을 빠뜨리지 마라.
+- 한국어로 쓰되 한자·일본어를 섞지 마라.
+{brief_block}
+[기획안]
+{json.dumps(plan, ensure_ascii=False, indent=1)[:24000]}
+
+[출력 형식]
+설명·마크다운 없이 **실행 가능한 JavaScript 본문만** 출력하라.
+require, var prs, prs.layout, THEME_INFO, ASSETS_DIR, A 는 이미 선언되어 있으니 다시 선언하지 마라.
+사진 변수 IMG[n] / GRAD[n] 도 이미 선언되어 있다(예: addSlideImage(s, IMG[3], {{}})).
+마지막 줄은 반드시: prs.writeFile({{ fileName: process.argv[2] }});
+"""
+
+
+def _extract_js_body(response: str) -> str:
+    """모델 응답에서 실행할 JS 본문만 뽑는다(주입 헤더와 충돌하는 선언은 제거)."""
+    text = (response or "").strip()
+    m = re.search(r"```(?:javascript|js)?\s*\n(.*?)```", text, re.DOTALL)
+    if m:
+        text = m.group(1).strip()
+    if "addSlide" not in text:
+        raise ValueError("addSlide 호출이 없다")
+    # 헤더에서 이미 선언한 것들을 모델이 또 선언하면 SyntaxError가 난다.
+    drop = re.compile(
+        r"^\s*(?:var|let|const)\s+(?:path|pptxgen|prs|THEME_INFO|ASSETS_DIR|A)\s*=|"
+        r"^\s*(?:const|var|let)\s*\{[^}]*\}\s*=\s*require\(|"
+        r"^\s*require\(|^\s*prs\.layout\s*=|^\s*module\.exports")
+    lines = [ln for ln in text.splitlines() if not drop.match(ln)]
+    body = "\n".join(lines)
+    if "writeFile" not in body:
+        body += '\nprs.writeFile({ fileName: process.argv[2] });'
+    return body
 
 
 def generate_freeform_from_file(doc_path: str, out_pptx: str, assets_dir: str = DEFAULT_ASSETS,
