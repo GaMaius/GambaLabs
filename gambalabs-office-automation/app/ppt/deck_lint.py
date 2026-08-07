@@ -65,6 +65,9 @@ def lint(pptx_path: str, expect: dict = None) -> List[str]:
     prs = Presentation(pptx_path)
     problems = []
     expect = expect or {}
+    # 실제 슬라이드 크기를 파일에서 읽는다(16:9 / 4:3 둘 다 지원).
+    W_IN = round(prs.slide_width / EMU, 3)
+    H_IN = round(prs.slide_height / EMU, 3)
 
     if len(prs.slides) == 0:
         return ["슬라이드가 하나도 없다."]

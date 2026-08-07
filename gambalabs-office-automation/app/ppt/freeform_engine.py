@@ -78,6 +78,7 @@ def _resolve_theme(theme: str = None, theme_config: dict = None) -> dict:
             info[k] = t[k]
     if not info.get("coverBg"):
         info["coverBg"] = C.get("brand") or C.get("hero") or "123979"
+    info["ratio"] = t.get("ratio", "16:9")
     return info
 
 
@@ -543,12 +544,16 @@ def _run_js(js_body: str, out_pptx: str, assets_dir: str, theme_info: dict,
             media: tuple = None, timeout: int = 90):
     """헬퍼·테마·미디어 경로를 주입해 pptxgenjs 코드를 실행. 실패하면 RuntimeError(stderr)."""
     img_map, grad_map = media or ({}, {})
+    ratio = (theme_info or {}).get("ratio", "16:9")
+    sw, sh = (10.0, 7.5) if ratio == "4:3" else (13.333, 7.5)
+    layout = "LAYOUT_4x3" if ratio == "4:3" else "LAYOUT_WIDE"
     header = f"""
 var path = require("path");
 var pptxgen = require("pptxgenjs");
 var THEME_INFO = {json.dumps(theme_info, ensure_ascii=False)};
 var ASSETS_DIR = {json.dumps(assets_dir.replace(chr(92), '/'))};
 var A = function(p) {{ return path.resolve(ASSETS_DIR, p); }};
+var SLIDE_W = {sw}, SLIDE_H = {sh};
 var IMG = {json.dumps(img_map, ensure_ascii=False)};
 var GRAD = {json.dumps(grad_map, ensure_ascii=False)};
 // 프롬프트에서 C/F를 쓰라고 안내하므로 여기서 반드시 정의해 둔다.
@@ -558,7 +563,7 @@ var F = THEME_INFO.F || {{}};
 var useImages = THEME_INFO.useImages;
 {_HELPERS_CODE}
 var prs = new pptxgen();
-prs.layout = "LAYOUT_WIDE";
+prs.layout = "{layout}";
 """
     tmp_dir = os.path.join(PROJECT_DIR, "output", "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
@@ -695,6 +700,8 @@ def _code_prompt(plan: dict, assets_dir: str, theme_info: dict, brief: str = "")
     C = theme_info.get("C", {})
     F = theme_info.get("F", {})
     use_images = theme_info.get("useImages", True)
+    SW, SH = (10.0, 7.5) if theme_info.get("ratio") == "4:3" else (13.333, 7.5)
+    SXMAX = round(SW - 0.8, 2)
 
     # 기획안에서 이미 확정된 미디어 경로를 그대로 보여준다(모델이 경로를 지어내지 않도록)
     media_lines = []
@@ -725,8 +732,8 @@ def _code_prompt(plan: dict, assets_dir: str, theme_info: dict, brief: str = "")
 각 슬라이드의 내용 분량과 성격에 맞는 배치를 그 자리에서 설계하라.
 
 [캔버스 · 그리드]
-- 슬라이드는 13.333 x 7.5 인치. 상단 1.05인치는 헤더 밴드 영역이다(본문은 y >= 1.25부터).
-- 좌우 여백 0.8인치를 지켜라. 즉 본문 가용 폭은 x 0.8 ~ 12.53.
+- 슬라이드는 {SW} x {SH} 인치. 상단 1.05인치는 헤더 밴드 영역이다(본문은 y >= 1.25부터).
+- 좌우 여백 0.8인치를 지켜라. 즉 본문 가용 폭은 x 0.8 ~ {SXMAX}.
 - 요소 간 간격은 0.3~0.5인치. 요소가 슬라이드 밖으로 나가면 안 된다.
 
 [타이포]

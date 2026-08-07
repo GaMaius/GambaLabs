@@ -159,7 +159,8 @@ class Api:
         except Exception:
             return None
 
-    def set_form_theme(self, bg, accent, ink, band_fill=True, font="맑은 고딕", gradient=False):
+    def set_form_theme(self, bg, accent, ink, band_fill=True, font="맑은 고딕", gradient=False,
+                       ratio="16:9"):
         """디자인 설정 폼 값으로 '임시 테마'를 만들어 현재 적용(저장 안 함).
         gradient=True면 배경 그라데이션 PNG를 만들어 themeConfig.gradientBg로 첨부(render_deck.js가 콘텐츠 슬라이드 배경에 사용)."""
         try:
@@ -174,6 +175,9 @@ class Api:
                     cfg["gradientBg"] = _grad.gradient_png("#" + bg_hex, "#" + c2, direction="v")
                 except Exception as e:
                     print("[set_form_theme] gradient 생성 실패:", e)
+            # 비율은 예전엔 폼에서 받기만 하고 어디에도 쓰이지 않았다(죽은 항목).
+            # 테마 설정에 실어 렌더까지 전달한다.
+            cfg["ratio"] = ratio if ratio in ("16:9", "4:3") else "16:9"
             self._form_theme = cfg
             self.theme = "__form"
             return {"ok": True}
@@ -181,14 +185,44 @@ class Api:
             return {"error": str(e)}
 
     # ── 디자인 브리프(목적·자유 디렉션·참고자료) ─────────
-    def set_design_brief(self, purpose="", direction="", refs=None):
-        """폼의 자유 입력(목적·추가 디렉션)과 참고자료 경로 목록을 저장. 생성 시 LLM 프롬프트에 주입된다."""
+    # 폼의 선택값 → 생성 프롬프트에 넣을 구체적 지시문.
+    # 선택지가 결과를 실제로 바꾸게 하려면 '무엇을 다르게 할지'를 문장으로 못박아야 한다.
+    _USAGE_RULE = {
+        "talk": "이 덱은 발표자가 말로 설명하며 띄우는 자료다. 슬라이드 글은 키워드와 짧은 구로 줄이고, "
+                "한 슬라이드에 핵심 메시지 하나만 둔다. 문장을 그대로 읽게 만들지 마라.",
+        "read": "이 덱은 발표자 없이 읽는 배포 자료다. 각 항목을 완결된 문장으로 쓰고, 왜 그런지 근거를 "
+                "한 줄씩 덧붙여 혼자 읽어도 이해되게 하라.",
+        "draft": "이 덱은 내부 검토용 초안이다. 꾸미기보다 내용 전달이 우선이다. 항목을 빠짐없이 담고 "
+                 "구조를 단순하게 유지하라.",
+    }
+    _LENGTH_RULE = {
+        "auto": "",
+        "short": "표지 포함 5장 내외로 압축하라. 비슷한 내용은 한 장으로 합쳐라.",
+        "mid": "표지 포함 8~10장으로 구성하라.",
+        "long": "표지 포함 14장 이상으로 충분히 펼쳐라. 각 주제를 슬라이드 하나씩 배정하라.",
+    }
+    _PHOTO_RULE = {
+        "none": "사진을 쓰지 마라. 도형·색·타이포그래피만으로 구성하라(스톡 이미지 검색 금지).",
+        "auto": "사진은 내용에 꼭 필요할 때만 쓰고, 그 외에는 도형과 여백으로 정리하라.",
+        "rich": "표지와 주요 슬라이드에 사진을 적극적으로 쓰되, 글자가 얹히는 곳은 차분한 배경 이미지를 골라라.",
+    }
+
+    def set_design_brief(self, purpose="", direction="", refs=None,
+                         usage="talk", length="auto", photos="auto"):
+        """폼 입력을 저장. 생성 시 LLM 프롬프트에 주입된다.
+
+        usage/length/photos는 '색·폰트'와 달리 덱의 내용 구성을 바꾸는 값이다.
+        (예전 폼은 색·폰트만 다뤄서 무엇을 골라도 결과가 비슷했다)
+        """
         if isinstance(refs, str):
             refs = [refs]
         refs = [r for r in (refs or []) if r and os.path.exists(r)]
         self._brief = {"purpose": (purpose or "").strip(),
                        "direction": (direction or "").strip(),
-                       "refs": refs}
+                       "refs": refs,
+                       "usage": usage if usage in self._USAGE_RULE else "talk",
+                       "length": length if length in self._LENGTH_RULE else "auto",
+                       "photos": photos if photos in self._PHOTO_RULE else "auto"}
         return {"ok": True, "refs": len(refs)}
 
     def _load_ref_text(self, path, limit=1500):
@@ -213,7 +247,15 @@ class Api:
             return ""
         parts = []
         if b.get("purpose"):
-            parts.append(f"[발표 목적·톤]\n{b['purpose']}")
+            parts.append(f"[발표 목적·청중]\n{b['purpose']}")
+
+        rules = [self._USAGE_RULE.get(b.get("usage", "talk"), ""),
+                 self._LENGTH_RULE.get(b.get("length", "auto"), ""),
+                 self._PHOTO_RULE.get(b.get("photos", "auto"), "")]
+        rules = [r for r in rules if r]
+        if rules:
+            parts.append("[구성 지침 — 반드시 지켜라]\n- " + "\n- ".join(rules))
+
         if b.get("direction"):
             parts.append(f"[제작자 추가 디렉션 — 최대한 반영]\n{b['direction']}")
         for i, r in enumerate(b.get("refs") or [], 1):

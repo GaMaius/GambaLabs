@@ -226,26 +226,46 @@ function refreshSwatches() {
   $("swAccent").style.background = $("qAccent").value;
   $("swInk").style.background = $("qInk").value;
 }
-/* 채운 항목 배지(●) 표시 */
+/* 무드 프리셋 — 배경·강조·글자를 한 세트로. 색 3개를 따로 고르게 하면 대비가 깨진 조합이 나온다. */
+const MOODS = {
+  navy:  { bg: "#f4f6fa", accent: "#0038a3", ink: "#123979" },
+  clean: { bg: "#ffffff", accent: "#2456c7", ink: "#222222" },
+  dark:  { bg: "#141a2b", accent: "#4e86c6", ink: "#f2f5fb" },
+  warm:  { bg: "#faf7f2", accent: "#b4541f", ink: "#2e2621" },
+};
+function applyMood(btn) {
+  qPick("qMood", btn);
+  const m = MOODS[btn.dataset.v];
+  if (m) { $("qBgColor").value = m.bg; $("qAccent").value = m.accent; $("qInk").value = m.ink; }
+  markFilled();
+}
+/* 색을 직접 만지면 무드 선택은 해제한다(어떤 프리셋도 아닌 상태) */
+function onColorEdit() { setChip("qMood", ""); markFilled(); }
+function toggleFontInput() {
+  $("qFontCustom").classList.toggle("hidden", $("qFont").dataset.val !== "__custom");
+}
+
+/* 채운 항목 배지(●) 표시 — 기본값과 다르면 채운 것으로 본다 */
 function markFilled() {
   refreshSwatches();
   const set = (id, on) => { const e = $(id); if (e) e.textContent = on ? "●" : ""; };
+  const v = (id) => $(id).dataset.val;
   set("b_purpose", $("qPurpose").value.trim());
-  set("b_direction", $("qDirection").value.trim());
-  set("b_ratio", $("qRatio").dataset.val !== "16:9");
-  set("b_color", $("qAccent").value.toLowerCase() !== "#0038a3" || $("qInk").value.toLowerCase() !== "#1a1a1a" || $("qBgTone").dataset.val !== "light" || $("qSeedTheme").value);
-  set("b_bg", $("qBg").dataset.val !== "solid");
-  set("b_font", $("qFont").dataset.val !== "맑은 고딕");
-  set("b_refs", REFS.length);
+  set("b_shape", v("qUsage") !== "talk" || v("qLength") !== "auto");
+  set("b_color", v("qMood") !== "navy" || $("qSeedTheme").value);
+  set("b_visual", v("qPhotos") !== "auto" || v("qBg") !== "solid"
+    || v("qRatio") !== "16:9" || v("qFont") !== "맑은 고딕");
+  set("b_extra", $("qDirection").value.trim() || REFS.length);
 }
-/* 기반 테마 → 폼 색 시드 */
+/* 저장 테마 → 폼 색 시드 */
 async function seedFromTheme() {
   const id = $("qSeedTheme").value; if (!id) return;
   try {
     const c = await api().theme_colors(id);
     if (c && c.accent) $("qAccent").value = "#" + c.accent;
     if (c && c.ink) $("qInk").value = "#" + c.ink;
-    if (c && c.bg) { const dark = parseInt(c.bg.slice(0, 2), 16) * 0.299 + parseInt(c.bg.slice(2, 4), 16) * 0.587 + parseInt(c.bg.slice(4, 6), 16) * 0.114 < 140; setChip("qBgTone", dark ? "dark" : "light"); }
+    if (c && c.bg) $("qBgColor").value = "#" + c.bg;
+    setChip("qMood", "");
     markFilled();
   } catch (e) {}
 }
@@ -265,31 +285,33 @@ async function pickPalette() {
     $("palCta").classList.remove("hidden");
   } catch (e) { $("palFile").textContent = String(e.message || e); }
 }
-function useSwatch(h) { $("qAccent").value = "#" + h; markFilled(); }
+function useSwatch(h) { $("qAccent").value = "#" + h; onColorEdit(); }
 function applyAutoPalette() {
   if (!PALETTE) return;
   if (PALETTE.accent) $("qAccent").value = "#" + PALETTE.accent;
   if (PALETTE.ink) $("qInk").value = "#" + PALETTE.ink;
-  if (PALETTE.bg) { const b = PALETTE.bg; const dark = parseInt(b.slice(0, 2), 16) * 0.299 + parseInt(b.slice(2, 4), 16) * 0.587 + parseInt(b.slice(4, 6), 16) * 0.114 < 140; setChip("qBgTone", dark ? "dark" : "light"); }
-  markFilled();
+  if (PALETTE.bg) $("qBgColor").value = "#" + PALETTE.bg;
+  onColorEdit();
 }
 function readDesignForm() {
-  const bgTone = $("qBgTone").dataset.val;
-  const bg = bgTone === "dark" ? "141a2b" : "f6f8fc";   // 배경 톤 → 배경색
-  const font = $("qFont").dataset.val === "__custom" ? ($("qFontCustom").value.trim() || "맑은 고딕") : $("qFont").dataset.val;
+  const v = (id) => $(id).dataset.val;
+  const font = v("qFont") === "__custom" ? ($("qFontCustom").value.trim() || "맑은 고딕") : v("qFont");
   return {
     purpose: $("qPurpose").value.trim(),
     direction: $("qDirection").value.trim(),
-    ratio: $("qRatio").dataset.val,
-    bg, accent: $("qAccent").value.replace("#", ""), ink: $("qInk").value.replace("#", ""),
-    band_fill: true, gradient: $("qBg").dataset.val === "gradient",
+    usage: v("qUsage"), length: v("qLength"), photos: v("qPhotos"),
+    ratio: v("qRatio"),
+    bg: $("qBgColor").value.replace("#", ""),
+    accent: $("qAccent").value.replace("#", ""),
+    ink: $("qInk").value.replace("#", ""),
+    band_fill: true, gradient: v("qBg") === "gradient",
     font, refs: REFS.slice(),
   };
 }
 async function applyFormTheme() {
   const f = readDesignForm();
-  try { await api().set_form_theme(f.bg, f.accent, f.ink, f.band_fill, f.font, f.gradient); } catch (e) {}
-  try { await api().set_design_brief(f.purpose, f.direction, f.refs); } catch (e) {}
+  try { await api().set_form_theme(f.bg, f.accent, f.ink, f.band_fill, f.font, f.gradient, f.ratio); } catch (e) {}
+  try { await api().set_design_brief(f.purpose, f.direction, f.refs, f.usage, f.length, f.photos); } catch (e) {}
   return f;
 }
 async function makeThemeFromForm() {

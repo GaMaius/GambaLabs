@@ -1,5 +1,7 @@
 // Smart PPT Layout Helpers — Premium Design System (Claude / Gamma Level)
-const W = 13.333, H = 7.5;
+// 슬라이드 크기는 헤더에서 주입한다(비율 16:9 / 4:3).
+const W = (typeof SLIDE_W !== "undefined") ? SLIDE_W : 13.333;
+const H = (typeof SLIDE_H !== "undefined") ? SLIDE_H : 7.5;
 
 // 배경색이 밝은지 판정 — 표지 글자색을 뒤집을 때 쓴다.
 function isLight(hex) {
