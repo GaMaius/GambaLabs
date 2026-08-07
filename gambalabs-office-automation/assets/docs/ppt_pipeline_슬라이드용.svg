@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="856" viewBox="0 0 1920 856" font-family="Malgun Gothic, 맑은 고딕, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#8A97A8"/>
+    </marker>
+    <marker id="aL" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#D2762B"/>
+    </marker>
+    <marker id="aG" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#8FA3BF"/>
+    </marker>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#123979" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <!-- ── 입력 ─────────────────────────────────────────── -->
+  <rect x="60" y="212" width="232" height="272" rx="10" fill="#F2F5FA" stroke="#C6D0DE" stroke-width="1.5"/>
+  <text x="176" y="264" font-size="27" font-weight="bold" fill="#123979" text-anchor="middle">입력</text>
+  <line x1="92" y1="284" x2="260" y2="284" stroke="#D5DAE2" stroke-width="1.5"/>
+  <text x="92" y="326" font-size="23" fill="#3C4756">• 문서 (md · txt)</text>
+  <text x="92" y="372" font-size="23" fill="#3C4756">• 러프 PPT</text>
+  <text x="92" y="418" font-size="23" fill="#3C4756">• 디자인 설정 폼</text>
+  <text x="110" y="450" font-size="19" fill="#8A97A8">색 · 폰트 · 목적</text>
+  <line x1="302" y1="348" x2="324" y2="348" stroke="#8A97A8" stroke-width="3" marker-end="url(#a)"/>
+
+  <!-- ── ① 기획 ───────────────────────────────────────── -->
+  <g filter="url(#sh)">
+    <rect x="332" y="182" width="278" height="332" rx="12" fill="#FFFFFF" stroke="#D5DAE2" stroke-width="1.5"/>
+    <path d="M332 194 a12 12 0 0 1 12 -12 h254 a12 12 0 0 1 12 12 v74 h-278 z" fill="#2E6FB7"/>
+  </g>
+  <text x="358" y="226" font-size="28" font-weight="bold" fill="#FFFFFF">① 기획</text>
+  <text x="358" y="254" font-size="19" fill="#D6E4F5">LLM이 구성을 정한다</text>
+  <text x="358" y="312" font-size="24" font-weight="bold" fill="#123979">슬라이드 플랜 (JSON)</text>
+  <text x="358" y="356" font-size="22" fill="#3C4756">• 슬라이드 구성 · 분량</text>
+  <text x="358" y="396" font-size="22" fill="#3C4756">• 레이아웃 유형</text>
+  <text x="358" y="436" font-size="22" fill="#3C4756">• 차트 데이터 · 사진</text>
+  <rect x="358" y="452" width="226" height="34" rx="17" fill="#EDF3FA"/>
+  <text x="471" y="476" font-size="19" fill="#2E6FB7" text-anchor="middle">Groq · Ollama · OpenAI</text>
+
+  <!-- ── 분기 ─────────────────────────────────────────── -->
+  <line x1="620" y1="348" x2="640" y2="348" stroke="#8A97A8" stroke-width="3" marker-end="url(#a)"/>
+  <rect x="648" y="306" width="140" height="84" rx="10" fill="#123979"/>
+  <text x="718" y="342" font-size="21" font-weight="bold" fill="#FFFFFF" text-anchor="middle">모델 급</text>
+  <text x="718" y="368" font-size="21" font-weight="bold" fill="#FFFFFF" text-anchor="middle">판정</text>
+  <text x="718" y="410" font-size="18" fill="#8A97A8" text-anchor="middle">design_policy.py</text>
+  <path d="M788 330 H 806 V 196 H 826" fill="none" stroke="#8A97A8" stroke-width="3" marker-end="url(#a)"/>
+  <path d="M788 366 H 806 V 502 H 826" fill="none" stroke="#8A97A8" stroke-width="3" marker-end="url(#a)"/>
+
+  <!-- ── 경로 A : template ────────────────────────────── -->
+  <g filter="url(#sh)">
+    <rect x="834" y="90" width="730" height="212" rx="12" fill="#FFFFFF" stroke="#D5DAE2" stroke-width="1.5"/>
+    <path d="M834 102 a12 12 0 0 1 12 -12 h706 a12 12 0 0 1 12 12 v50 h-730 z" fill="#4A8FD4"/>
+  </g>
+  <text x="860" y="137" font-size="25" font-weight="bold" fill="#FFFFFF">template<tspan font-weight="normal" font-size="21" fill="#E1EDFA" dx="14">약한 모델 · 로컬 3b · 7b</tspan></text>
+  <text x="860" y="197" font-size="26" font-weight="bold" fill="#123979">render_deck.js (pptxgenjs) 고정 렌더</text>
+  <text x="860" y="240" font-size="22" fill="#3C4756">고정 레이아웃 6종으로 결정적 렌더 · 후처리가 모델 실수를 보정</text>
+  <text x="860" y="276" font-size="21" fill="#8A97A8">모델이 쓴 코드는 실행하지 않는다 — 형식은 항상 보장</text>
+
+  <!-- ── 경로 B : freeform ────────────────────────────── -->
+  <g filter="url(#sh)">
+    <rect x="834" y="342" width="730" height="344" rx="12" fill="#FFFFFF" stroke="#0038A3" stroke-width="3"/>
+    <path d="M834 354 a12 12 0 0 1 12 -12 h706 a12 12 0 0 1 12 12 v50 h-730 z" fill="#0038A3"/>
+  </g>
+  <text x="860" y="389" font-size="25" font-weight="bold" fill="#FFFFFF">freeform<tspan font-weight="normal" font-size="21" fill="#CBDBF5" dx="14">강한 모델 · Groq 70B급 이상</tspan></text>
+
+  <rect x="856" y="424" width="216" height="118" rx="9" fill="#F5F8FC" stroke="#C6D0DE" stroke-width="1.5"/>
+  <text x="964" y="462" font-size="23" font-weight="bold" fill="#0038A3" text-anchor="middle">② 코드 생성</text>
+  <text x="964" y="494" font-size="20" fill="#5A6472" text-anchor="middle">코드 특화 모델이</text>
+  <text x="964" y="520" font-size="20" fill="#5A6472" text-anchor="middle">pptxgenjs 코드 작성</text>
+  <line x1="1080" y1="483" x2="1100" y2="483" stroke="#8A97A8" stroke-width="3" marker-end="url(#a)"/>
+
+  <rect x="1108" y="424" width="186" height="118" rx="9" fill="#F5F8FC" stroke="#C6D0DE" stroke-width="1.5"/>
+  <text x="1201" y="462" font-size="23" font-weight="bold" fill="#0038A3" text-anchor="middle">③ 실행</text>
+  <text x="1201" y="494" font-size="20" fill="#5A6472" text-anchor="middle">node로 돌려</text>
+  <text x="1201" y="520" font-size="20" fill="#5A6472" text-anchor="middle">.pptx 생성</text>
+  <line x1="1302" y1="483" x2="1322" y2="483" stroke="#8A97A8" stroke-width="3" marker-end="url(#a)"/>
+
+  <rect x="1330" y="424" width="216" height="118" rx="9" fill="#FFF8F1" stroke="#EBC49A" stroke-width="2"/>
+  <text x="1438" y="462" font-size="23" font-weight="bold" fill="#B45F17" text-anchor="middle">④ 검사</text>
+  <text x="1438" y="494" font-size="20" fill="#5A6472" text-anchor="middle">deck_lint · python-pptx</text>
+  <text x="1438" y="520" font-size="20" fill="#5A6472" text-anchor="middle">기하 결함 · 기획 일치</text>
+
+  <path d="M1438 552 V 588 H 964 V 552" fill="none" stroke="#D2762B" stroke-width="3"
+        stroke-dasharray="10 7" marker-end="url(#aL)"/>
+  <rect x="1004" y="602" width="394" height="44" rx="22" fill="#FDF3E9" stroke="#EBC49A" stroke-width="2"/>
+  <text x="1201" y="632" font-size="22" font-weight="bold" fill="#B45F17" text-anchor="middle">⑤ 결함 지적 → 다시 쓰기 (최대 3회)</text>
+
+  <!-- 폴백 안내 -->
+  <text x="1199" y="668" font-size="19" fill="#6E819B" text-anchor="middle">3회 안에 못 고치면 자유 설계 결과를 버리고 template 결과를 쓴다</text>
+
+  <!-- ── 출력 ─────────────────────────────────────────── -->
+  <path d="M1564 196 H 1594 V 348" fill="none" stroke="#8A97A8" stroke-width="3"/>
+  <path d="M1564 483 H 1594 V 348" fill="none" stroke="#8A97A8" stroke-width="3"/>
+  <line x1="1594" y1="348" x2="1618" y2="348" stroke="#8A97A8" stroke-width="3" marker-end="url(#a)"/>
+  <rect x="1626" y="262" width="234" height="172" rx="10" fill="#123979"/>
+  <text x="1743" y="316" font-size="30" font-weight="bold" fill="#FFFFFF" text-anchor="middle">.pptx</text>
+  <line x1="1660" y1="338" x2="1826" y2="338" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="1.5"/>
+  <text x="1743" y="374" font-size="21" fill="#C9D6EC" text-anchor="middle">감바랩스 테마</text>
+  <text x="1743" y="404" font-size="21" fill="#C9D6EC" text-anchor="middle">항상 적용</text>
+
+  <!-- ── 사용 도구 ────────────────────────────────────── -->
+  <rect x="60" y="712" width="1800" height="104" rx="12" fill="#F5F8FC" stroke="#DCE4EF" stroke-width="1.5"/>
+  <rect x="60" y="712" width="8" height="104" rx="4" fill="#123979"/>
+  <text x="92" y="748" font-size="24" font-weight="bold" fill="#123979">사용 도구<tspan dx="14" font-weight="normal" font-size="21" fill="#5A6472">— 렌더와 검사는 모두 검증된 라이브러리가 맡는다</tspan></text>
+  <g font-size="21" fill="#0038A3" font-weight="bold" text-anchor="middle">
+    <rect x="92" y="764" width="330" height="42" rx="8" fill="#FFFFFF" stroke="#DCE4EF"/>
+    <text x="257" y="792">pptxgenjs<tspan font-weight="normal" fill="#5A6472" font-size="19"> · 렌더</tspan></text>
+    <rect x="440" y="764" width="368" height="42" rx="8" fill="#FFFFFF" stroke="#DCE4EF"/>
+    <text x="624" y="792">python-pptx<tspan font-weight="normal" fill="#5A6472" font-size="19"> · 검사 · 러프 PPT 읽기</tspan></text>
+    <rect x="826" y="764" width="300" height="42" rx="8" fill="#FFFFFF" stroke="#DCE4EF"/>
+    <text x="976" y="792">Pillow<tspan font-weight="normal" fill="#5A6472" font-size="19"> · 그라데이션</tspan></text>
+    <rect x="1144" y="764" width="366" height="42" rx="8" fill="#FFFFFF" stroke="#DCE4EF"/>
+    <text x="1327" y="792">Pexels · Openverse<tspan font-weight="normal" fill="#5A6472" font-size="19"> · 사진</tspan></text>
+    <rect x="1528" y="764" width="300" height="42" rx="8" fill="#FFFFFF" stroke="#DCE4EF"/>
+    <text x="1678" y="792">@resvg/resvg-js<tspan font-weight="normal" fill="#5A6472" font-size="19"> · SVG</tspan></text>
+  </g>
+</svg>
