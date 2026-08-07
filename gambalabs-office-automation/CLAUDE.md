@@ -61,6 +61,24 @@ UI 모드(현재): **테마 개발 · PPT 디자인 · 자동 생성 PPT**(+플�
 - 렌더 자동 글자크기: `render_deck.js`의 `fitSize`/`fitList`가 박스에 맞게 폰트 계산(오버플로 방지).
 - 신규 레이아웃: `metrics`(지표 카드), `compare`(2열+도넛), 막대+추세선(`chart.trend`), 그라데이션(`gradient.py`).
 
+## 3-0. 레이아웃 그리드 (freeform 계열의 단일 기준)
+`freeform_helpers.js` · `freeform_engine.py` · `deck_lint.py` 세 곳이 **같은 숫자**를 쓴다. 하나만 고치지 말 것.
+```
+HEADER_H 1.05 / MARGIN 0.8 / LEAD_Y 1.21(h 0.5) / BODY_TOP 1.93 / BODY_BOTTOM 6.88 / 푸터 6.88~7.5
+본문 박스 = x 0.8~12.53, y 1.93~6.88  (11.73 × 4.95 in)
+```
+- **왜 생겼나**: 모델이 슬라이드마다 다른 y를 골라 본문이 위 1/3에만 몰리고 아래 45%가 백지로 나왔다.
+  기획안 JSON에 `lead`(제목 아래 한 줄 요약)를 필수로 넣고, 본문 요소는 이 박스를 세로로 꽉 채우게 강제한다.
+- **카드는 영역을 채우고, 짧은 글은 카드 안에서 해결한다**: `addCard`가 내용 분량을 재서 제목+본문 덩어리를
+  카드 세로 가운데로 모으고(같은 줄끼리 시작선 정렬), 큰 카드에는 인덱스 숫자(01·02)와 큰 글자를 준다.
+  카드 높이를 내용에 맞춰 줄이면 아래가 다시 비므로 그 방향으로 되돌리지 말 것.
+- **테두리 금지**: `line: {type:"none"}`을 빼면 파워포인트가 기본 검은 윤곽선을 그린다. 모델이 `line:{color:"000000"}`을
+  직접 넣은 사례도 있어 lint가 짙은 테두리를 잡아낸다.
+- **배경 장식은 한 장으로 굽는다** — `app/ppt/decor.py`
+  배경 사진 + 그라데이션을 파이썬에서 미리 합성해 `DECOR[n]` 한 장으로 만들고, `addHeader`의 6번째 인자로 넘긴다.
+  따로 얹으면 pptxgenjs z-order(=호출 순서)를 틀려 그라데이션이 배경 사진에 통째로 가려졌다(실제 산출물에서 확인).
+  스톡 사진은 `_brandify()`로 흑백→테마 색 톤 매핑한다(파스텔 스톡이 그대로 깔려 덱이 브랜드와 따로 놀았다).
+
 ## 3-1. 덱을 눈으로 보기 (중요) — `app/ppt/deck_render.py`, `app/ppt/deck_lint.py`
 LibreOffice 설치 완료(`C:\Program Files\LibreOffice\program\soffice.exe`) + `pypdfium2`.
 - `deck_render.to_images(pptx, out_dir)` → pptx→pdf→png. **작업 후 반드시 렌더해서 눈으로 볼 것.**
@@ -77,6 +95,10 @@ LibreOffice 설치 완료(`C:\Program Files\LibreOffice\program\soffice.exe`) + 
   고친 뒤 gpt-oss-120b는 1~2회차에 통과한다. **자유 설계가 실패하면 모델을 탓하기 전에
   주입 헤더와 lint 오탐부터 확인할 것.**
 - lint 오탐 주의: 헤더 밴드·로고 이미지를 '가려진 사진'으로 세면 루프가 헛돈다(제외 처리됨).
+  **표지는 좌우 여백·가로 쏠림 검사에서 뺀다** — 좌측 제목 + 우측 장식이 정상 구도인데 결함으로 잡혀 폴백했다.
+- lint가 보는 항목(기하 외): 세로 채움(본문 최하단 < 6.2면 지적) · 헤더 아래 과다 여백 · 짙은 테두리 ·
+  좌우 여백 비대칭 · 뒤에 그린 **사진**이 앞 사진을 덮는 경우. 예전 검사기는 이걸 전부 못 봐서
+  "아래 절반이 백지 + 검은 테두리 카드 + 가려진 그라데이션"인 덱이 1회차에 통과했다.
 
 ## 4. LLM 백엔드 — `src/common/llm_client.py` 및 `.env` (gitignore됨)
 - **Groq (GPT OSS - Llama 3.3 70B, Qwen 2.5 32B, DeepSeek R1)** / **Ollama** / **OpenAI** 3원 통합 팩토리.

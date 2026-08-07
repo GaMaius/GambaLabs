@@ -14,6 +14,15 @@ import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(os.path.dirname(HERE))
+
+# ── 레이아웃 그리드 — freeform_helpers.js 와 **같은 값**이어야 한다 ──
+# 프롬프트·템플릿·검사기가 전부 이 한 벌을 참조한다. 예전에는 각자 다른 y를 써서
+# 본문이 위쪽 1/3에만 몰리고 아래 절반이 통째로 비었다.
+HEADER_H = 1.05
+MARGIN = 0.8
+BODY_TOP = 1.93
+BODY_BOTTOM = 6.88
+BODY = {"x": MARGIN, "y": BODY_TOP, "w": 13.333 - MARGIN * 2, "h": BODY_BOTTOM - BODY_TOP}
 DEFAULT_ASSETS = os.path.join(PROJECT_DIR, "ppt-skill", "assets")
 SKILL_DIR = os.path.join(PROJECT_DIR, "ppt-skill")
 
@@ -73,7 +82,7 @@ def _resolve_theme(theme: str = None, theme_config: dict = None) -> dict:
     }
     # 표지 색은 따로 전달한다. C.hero는 '글자색'이라 그걸 표지 배경으로 쓰면
     # 글자색을 검정으로 고른 사용자의 표지가 새까맣게 나온다.
-    for k in ("coverBg", "coverInk", "coverSub"):
+    for k in ("coverBg", "coverInk", "coverSub", "coverFoot", "bandColor", "bandInk"):
         if t.get(k):
             info[k] = t[k]
     if not info.get("coverBg"):
@@ -200,13 +209,20 @@ def _plan_presentation(doc_text: str, brief: str = "", media_note: str = "") -> 
 [기획 원칙 — 맹탕 슬라이드 금지!]
 0. 모든 텍스트는 한국어로 쓰되 한자·일본어를 섞지 마라(예: "경량화"를 "軽量化"로 쓰지 말 것).
 1. 슬라이드 개수: 내용에 따라 4~8장의 알찬 슬라이드로 구성하라.
-2. 카드 내용 충실화: 한두 단어로 성의없이 끝내지 말고, 각 카드마다 명확한 타이틀과 2~3줄의 알찬 설명(또는 2~4개의 세부 불릿 포인트)을 채워라.
-3. 적절한 layout_type 선택:
+2. **모든 본문 슬라이드에 "lead"(제목 아래 한 줄 요약, 25~45자)를 반드시 넣어라.**
+   제목만 있고 리드가 없으면 슬라이드가 허전해 보인다. 예: "소음 환경에서도 흔들리지 않는 인식 성능".
+3. 카드 내용 충실화 — 이게 품질을 좌우한다:
+   - 카드 body는 **완성된 문장 1~2개(35~80자)**. "수백KB 초경량" 같은 조각글로 끝내지 마라.
+   - items(불릿)를 쓰면 **2~4개**, 각 항목 12~30자.
+   - 카드는 **3개를 기본**으로 하라(내용이 정말 둘뿐이면 2개도 허용). 4개면 2×2로 놓인다.
+   - 원문에 근거가 있으면 효과·이유를 한 마디 덧붙여 확장하라(없는 수치는 지어내지 마라).
+4. 적절한 layout_type 선택:
    - "cover": 표지 슬라이드 (title, subtitle, presenter)
-   - "cards": 기능/특징/요약 (title, cards: [{{ title, body }}, {{ title, items: ["불릿1", "불릿2"] }}]) (카드 2~6개)
-   - "stats": 핵심 수치/스탯 (title, stats: [{{ num: "90%+", label: "상세 설명" }}, {{ num: "수백KB", label: "상세 설명" }}]) (2~4개)
-   - "compare": 비교 분석 (title, leftCol: {{ title, items: [...] }}, rightCol: {{ title, items: [...] }})
-   - "chart": 수치 그래프 (title, chartData)
+   - "cards": 기능/특징/요약 (title, lead, cards: [{{ title, body }}, {{ title, items: ["불릿1", "불릿2"] }}]) (카드 2~6개)
+   - "stats": 핵심 수치/스탯 (title, lead, stats: [{{ num: "90%+", label: "짧은 라벨", desc: "한 줄 설명" }}])
+     **stats는 반드시 2~4개.** 수치가 하나뿐이면 stats로 만들지 말고 cards로 돌려라(숫자 하나만 뜬 백지 슬라이드가 된다).
+   - "compare": 비교 분석 (title, lead, leftCol: {{ title, items: [...] }}, rightCol: {{ title, items: [...] }})
+   - "chart": 수치 그래프 (title, lead, chartData)
 
 [chartData 규격 — 지시한 차트 종류를 반드시 지켜라]
 {{"kind":"bar|line|pie|doughnut", "labels":["2023","2024"], "series":[{{"name":"수익","values":[100,200]}}], "trend":true}}
@@ -238,11 +254,11 @@ def _plan_presentation(doc_text: str, brief: str = "", media_note: str = "") -> 
 {{
   "slides": [
     {{ "layout_type": "cover", "title": "대제목", "subtitle": "부제목", "presenter": "발표자" }},
-    {{ "layout_type": "cards", "title": "슬라이드 제목", "cards": [ {{ "title": "특징1", "body": "상세 설명 문장" }}, {{ "title": "특징2", "items": ["세부 기능 1", "세부 기능 2"] }} ] }},
-    {{ "layout_type": "stats", "title": "핵심 성능 지표", "stats": [ {{ "num": "90%+", "label": "SNR -20dB 소음 환경 인식률" }} ] }},
-    {{ "layout_type": "compare", "title": "방식 비교", "leftCol": {{ "title": "기존 방식", "items": ["클라우드 의존", "지연 발생"] }}, "rightCol": {{ "title": "WordSense", "items": ["온디바이스 독립 구동", "Zero Latency"] }} }},
-    {{ "layout_type": "chart", "title": "연도별 수익 추이", "chartData": {{ "kind": "bar", "trend": true, "labels": ["2023년", "2024년", "2025년", "2026년"], "series": [ {{ "name": "매출액", "values": [100, 180, 260, 320] }} ] }} }},
-    {{ "layout_type": "chart", "title": "국내 시장 점유율", "chartData": {{ "kind": "pie", "labels": ["당사", "기타"], "series": [ {{ "name": "점유율", "values": [46, 54] }} ] }} }}
+    {{ "layout_type": "cards", "title": "슬라이드 제목", "lead": "이 장에서 말하려는 바를 한 줄로", "cards": [ {{ "title": "특징1", "body": "무엇이 어떻게 좋은지 한두 문장으로 서술한다." }}, {{ "title": "특징2", "items": ["세부 기능 1", "세부 기능 2", "세부 기능 3"] }}, {{ "title": "특징3", "body": "세 번째 축을 한두 문장으로 설명한다." }} ] }},
+    {{ "layout_type": "stats", "title": "핵심 성능 지표", "lead": "소음 환경에서도 흔들리지 않는 인식 성능", "stats": [ {{ "num": "90%+", "label": "인식률", "desc": "SNR -20dB 악조건에서도 유지되는 정확도" }} ] }},
+    {{ "layout_type": "compare", "title": "방식 비교", "lead": "클라우드 의존을 걷어낸 온디바이스 구조", "leftCol": {{ "title": "기존 방식", "items": ["클라우드 의존", "지연 발생"] }}, "rightCol": {{ "title": "WordSense", "items": ["온디바이스 독립 구동", "Zero Latency"] }} }},
+    {{ "layout_type": "chart", "title": "연도별 수익 추이", "lead": "4년 연속 우상향, 연평균 30% 성장", "chartData": {{ "kind": "bar", "trend": true, "labels": ["2023년", "2024년", "2025년", "2026년"], "series": [ {{ "name": "매출액", "values": [100, 180, 260, 320] }} ] }} }},
+    {{ "layout_type": "chart", "title": "국내 시장 점유율", "lead": "국내 온디바이스 음성인식 시장의 46%", "chartData": {{ "kind": "pie", "labels": ["당사", "기타"], "series": [ {{ "name": "점유율", "values": [46, 54] }} ] }} }}
   ]
 }}
 """
@@ -338,7 +354,7 @@ def _resolve_media(plan: dict, theme_info: dict, user_images: dict = None) -> di
     - gradient는 gradient.py로 PNG를 만들어 그 경로를 넘긴다(pptxgenjs 그라데이션 채움은 불안정).
     """
     from app.ppt import image_search
-    from app.ppt import gradient as _grad
+    from app.ppt import decor as _decor
 
     C = theme_info.get("C", {}) or {}
     user_images = user_images or {}
@@ -366,6 +382,8 @@ def _resolve_media(plan: dict, theme_info: dict, user_images: dict = None) -> di
                 img["src"] = leftovers.pop(0)
                 sl["image"] = img
 
+    sw, sh = (10.0, 7.5) if theme_info.get("ratio") == "4:3" else (13.333, 7.5)
+
     for sl in slides:
 
         img = sl.get("image")
@@ -388,53 +406,56 @@ def _resolve_media(plan: dict, theme_info: dict, user_images: dict = None) -> di
             if not img.get("path"):
                 sl.pop("image", None)   # 자리표시자를 남기지 않는다
 
+        # 배경 사진 + 그라데이션은 한 장으로 미리 굽는다. 슬라이드에 따로 얹으면
+        # 나중에 그린 쪽이 앞의 것을 통째로 덮는다(자유 설계에서 실제로 그랬다).
         g = sl.get("gradient")
-        if isinstance(g, dict):
-            c1 = g.get("from") or C.get("brand") or "0038A3"
-            c2 = g.get("to") or C.get("body") or "ECECEC"
+        img = sl.get("image")
+        bg_photo = img if (isinstance(img, dict) and img.get("path")
+                           and img.get("mode") == "background") else None
+        if isinstance(g, dict) or bg_photo:
+            gspec = None
+            if isinstance(g, dict):
+                gspec = dict(g)
+                gspec["from"] = str(g.get("from") or C.get("brand") or "0038A3").lstrip("#")
+                gspec["to"] = str(g.get("to") or C.get("body") or "ECECEC").lstrip("#")
             try:
-                g["path"] = _grad.gradient_png("#" + str(c1).lstrip("#"), "#" + str(c2).lstrip("#"),
-                                               direction=g.get("dir", "h"),
-                                               reverse=bool(g.get("reverse")))
+                p = _decor.compose(
+                    C.get("body") or "F4F6FA", sw, sh,
+                    photo=(bg_photo or {}).get("path"),
+                    photo_transparency=(bg_photo or {}).get("transparency", 72),
+                    gradient=gspec, brand_color=C.get("brand") or "0038A3")
+                if p:
+                    sl["decor"] = {"path": p}
+                    sl.pop("gradient", None)
+                    if bg_photo:
+                        sl.pop("image", None)     # 배경으로 구웠으니 따로 얹지 않는다
             except Exception as e:
-                print(f"[freeform_engine] 그라데이션 생성 실패: {e}")
+                print(f"[freeform_engine] 배경 장식 합성 실패: {e}")
                 sl.pop("gradient", None)
     return plan
 
 
-def _decor_js(sl: dict) -> str:
-    """슬라이드의 그라데이션·이미지 코드. 카드보다 먼저 깔려야 뒤에 남는다.
+def _decor_arg(sl: dict) -> str:
+    """배경 장식 경로를 addHeader에 넘길 인자로. 없으면 null.
 
-    쌓는 순서: 배경 이미지 → 그라데이션 패널 → 영역 이미지.
-    (그라데이션을 배경 이미지보다 먼저 깔면 이미지에 완전히 가려 보이지 않는다)
+    배경 사진과 그라데이션은 _resolve_media에서 이미 한 장(decor)으로 합성해 두었고,
+    addHeader가 밴드·리드·푸터보다 먼저 깔아 준다. 밖에서 따로 얹으면 순서를 틀려
+    리드·푸터가 장식에 덮인다(실제로 그랬다).
     """
-    g = sl.get("gradient")
+    d = sl.get("decor")
+    if isinstance(d, dict) and d.get("path"):
+        return json.dumps(d["path"], ensure_ascii=False)
+    return "null"
+
+
+def _image_js(sl: dict) -> str:
+    """본문 영역에 놓는 사진 한 장(사용자가 넣은 사진). 카드보다 먼저 그린다."""
     img = sl.get("image")
-    has_g = isinstance(g, dict) and g.get("path")
-    has_i = isinstance(img, dict) and img.get("path")
-
-    def gradient_line():
-        rect = {k: g[k] for k in ("x", "y", "w", "h") if k in g}
-        # 배경 이미지 위에 전면 그라데이션을 덮으면 이미지가 사라진다 → 영역 지정이 없으면 우측 패널로
-        if not rect and has_i and img.get("mode") == "background":
-            rect = {"x": 6.9, "y": 1.05, "w": 6.43, "h": 6.45}
-        return f"addGradientPanel(s, {json.dumps(g['path'], ensure_ascii=False)}, {json.dumps(rect)});"
-
-    def image_line():
-        opts = {k: img[k] for k in ("mode", "transparency", "x", "y", "w", "h") if k in img}
-        return f"addSlideImage(s, {json.dumps(img['path'], ensure_ascii=False)}, {json.dumps(opts, ensure_ascii=False)});"
-
-    out = []
-    if has_i and img.get("mode") == "background":
-        out.append(image_line())
-        if has_g:
-            out.append(gradient_line())
-    else:
-        if has_g:
-            out.append(gradient_line())
-        if has_i:
-            out.append(image_line())
-    return " ".join(out)
+    if not (isinstance(img, dict) and img.get("path")):
+        return ""
+    opts = {k: img[k] for k in ("mode", "transparency", "x", "y", "w", "h") if k in img}
+    return (f"addSlideImage(s, {json.dumps(img['path'], ensure_ascii=False)}, "
+            f"{json.dumps(opts, ensure_ascii=False)});")
 
 
 def _convert_plan_to_js(plan: dict) -> str:
@@ -449,28 +470,29 @@ def _convert_plan_to_js(plan: dict) -> str:
             lines.append(f"addCover(prs, {title}, {sub}, {pres}, THEME_INFO, ASSETS_DIR);")
             continue
 
-        head = f"var s = prs.addSlide(); addHeader(s, {title}, THEME_INFO, ASSETS_DIR);"
+        lead = json.dumps(slide.get("lead", ""), ensure_ascii=False)
+        head = (f"var s = prs.addSlide(); "
+                f"addHeader(s, {title}, THEME_INFO, ASSETS_DIR, {lead}, {_decor_arg(slide)});")
         img = slide.get("image") or {}
         side = isinstance(img, dict) and bool(img.get("path")) and img.get("mode") != "background"
         if side:
             # 사진 자리를 실제로 비워 둔다. 안 그러면 카드가 사진을 덮어 사진이 안 보인다.
-            img.setdefault("x", 7.3), img.setdefault("y", 1.5)
-            img.setdefault("w", 5.4), img.setdefault("h", 5.2)
-            rect = {"x": 0.8, "y": 1.05, "w": 6.2, "h": 6.45}
+            img.setdefault("x", BODY["x"] + 6.13), img.setdefault("y", BODY["y"])
+            img.setdefault("w", 5.6), img.setdefault("h", BODY["h"])
+            rect = {"x": BODY["x"], "y": BODY["y"], "w": 5.83, "h": BODY["h"]}
         else:
             rect = {}
-        decor = _decor_js(slide)          # 그라데이션·이미지는 콘텐츠보다 먼저
+        decor = _image_js(slide)          # 본문 사진은 카드보다 먼저
         rect_js = json.dumps(rect)
 
         if stype == "stats":
             body = f"addStats(s, {json.dumps(slide.get('stats', []), ensure_ascii=False)}, THEME_INFO, {rect_js});"
         elif stype == "compare":
             body = (f"addCompare(s, {json.dumps(slide.get('leftCol', {}), ensure_ascii=False)}, "
-                    f"{json.dumps(slide.get('rightCol', {}), ensure_ascii=False)}, THEME_INFO);")
+                    f"{json.dumps(slide.get('rightCol', {}), ensure_ascii=False)}, THEME_INFO, {rect_js});")
         elif stype == "chart":
-            crect = {"x": 0.8, "y": 1.6, "w": 6.2, "h": 4.8} if side else {}
             body = (f"addChart(s, {title}, {json.dumps(slide.get('chartData', {}), ensure_ascii=False)}, "
-                    f"THEME_INFO, prs, {json.dumps(crect)});")
+                    f"THEME_INFO, prs, {rect_js});")
         else:
             body = f"addCards(s, {json.dumps(slide.get('cards', []), ensure_ascii=False)}, THEME_INFO, {rect_js});"
 
@@ -528,22 +550,22 @@ def generate_freeform(doc_text: str, out_pptx: str, assets_dir: str = DEFAULT_AS
 
 
 def _media_maps(plan: dict) -> tuple:
-    """기획안에서 슬라이드 번호 → 이미지/그라데이션 경로 맵을 뽑는다."""
-    img, grad = {}, {}
+    """기획안에서 슬라이드 번호 → 영역 사진 / 배경 장식 경로 맵을 뽑는다."""
+    img, dec = {}, {}
     for i, sl in enumerate(plan.get("slides", []), 1):
         p = (sl.get("image") or {}).get("path") if isinstance(sl.get("image"), dict) else None
         if p:
             img[str(i)] = p
-        gp = (sl.get("gradient") or {}).get("path") if isinstance(sl.get("gradient"), dict) else None
-        if gp:
-            grad[str(i)] = gp
-    return img, grad
+        dp = (sl.get("decor") or {}).get("path") if isinstance(sl.get("decor"), dict) else None
+        if dp:
+            dec[str(i)] = dp
+    return img, dec
 
 
 def _run_js(js_body: str, out_pptx: str, assets_dir: str, theme_info: dict,
             media: tuple = None, timeout: int = 90):
     """헬퍼·테마·미디어 경로를 주입해 pptxgenjs 코드를 실행. 실패하면 RuntimeError(stderr)."""
-    img_map, grad_map = media or ({}, {})
+    img_map, decor_map = media or ({}, {})
     ratio = (theme_info or {}).get("ratio", "16:9")
     sw, sh = (10.0, 7.5) if ratio == "4:3" else (13.333, 7.5)
     layout = "LAYOUT_4x3" if ratio == "4:3" else "LAYOUT_WIDE"
@@ -555,7 +577,8 @@ var ASSETS_DIR = {json.dumps(assets_dir.replace(chr(92), '/'))};
 var A = function(p) {{ return path.resolve(ASSETS_DIR, p); }};
 var SLIDE_W = {sw}, SLIDE_H = {sh};
 var IMG = {json.dumps(img_map, ensure_ascii=False)};
-var GRAD = {json.dumps(grad_map, ensure_ascii=False)};
+var DECOR = {json.dumps(decor_map, ensure_ascii=False)};
+var GRAD = {{}};   // 구버전 호환(그라데이션은 DECOR에 합성되어 들어간다)
 // 프롬프트에서 C/F를 쓰라고 안내하므로 여기서 반드시 정의해 둔다.
 // (없으면 모델이 쓴 코드가 전부 "C is not defined"로 죽는다 — 실제로 그랬다)
 var C = THEME_INFO.C || {{}};
@@ -667,6 +690,8 @@ def _generate_by_code(plan: dict, out_pptx: str, assets_dir: str,
             return False
 
         print(f"[freeform_engine] 자유 설계 {rnd}회차 기하 결함 {len(problems)}건 → 수정 요청")
+        for p in problems[:8]:
+            print("   ·", p)
         prev_js = js
         feedback = ("생성된 덱을 검사하니 아래 문제가 있다. 해당 슬라이드의 좌표·크기를 고쳐 "
                     "전체 코드를 다시 출력하라. 설명 없이 코드만.\n- " + "\n- ".join(problems[:8]))
@@ -701,19 +726,23 @@ def _code_prompt(plan: dict, assets_dir: str, theme_info: dict, brief: str = "")
     F = theme_info.get("F", {})
     use_images = theme_info.get("useImages", True)
     SW, SH = (10.0, 7.5) if theme_info.get("ratio") == "4:3" else (13.333, 7.5)
-    SXMAX = round(SW - 0.8, 2)
+    SXMAX = round(SW - MARGIN, 2)
+    BODYL = {"x": MARGIN, "y": BODY_TOP,
+             "w": round(SW - MARGIN * 2, 2), "h": round(BODY_BOTTOM - BODY_TOP, 2)}
 
     # 기획안에서 이미 확정된 미디어 경로를 그대로 보여준다(모델이 경로를 지어내지 않도록)
     media_lines = []
     for i, sl in enumerate(plan.get("slides", []), 1):
         img = sl.get("image") or {}
-        g = sl.get("gradient") or {}
+        d = sl.get("decor") or {}
+        if isinstance(d, dict) and d.get("path"):
+            media_lines.append(
+                f"  슬라이드 {i} 배경 장식(그라데이션·배경사진 합성본): "
+                f"addHeader의 6번째 인자로 DECOR[{i}] 를 넘겨라(따로 얹지 마라)")
         if isinstance(img, dict) and img.get("path"):
             media_lines.append(
-                f'  슬라이드 {i} 사진: IMG[{i}]  (mode={img.get("mode", "region")}'
-                + (f', 투명도 {img.get("transparency")}%' if img.get("transparency") else "") + ")")
-        if isinstance(g, dict) and g.get("path"):
-            media_lines.append(f"  슬라이드 {i} 그라데이션 패널: GRAD[{i}]")
+                f"  슬라이드 {i} 본문 사진: addSlideImage(s, IMG[{i}], {{x,y,w,h}});  "
+                f"← 이 사진 자리를 카드로 덮지 마라")
     media_block = ("\n[이 덱에서 쓸 수 있는 이미지 — 반드시 이 변수만 써라. 경로를 새로 지어내지 마라]\n"
                    + "\n".join(media_lines) + "\n") if media_lines else ""
 
@@ -731,36 +760,55 @@ def _code_prompt(plan: dict, assets_dir: str, theme_info: dict, brief: str = "")
 아래 [기획안]을 슬라이드별로 **직접 코드를 써서** 배치하라. 정해진 틀에 끼워 맞추지 말고,
 각 슬라이드의 내용 분량과 성격에 맞는 배치를 그 자리에서 설계하라.
 
-[캔버스 · 그리드]
-- 슬라이드는 {SW} x {SH} 인치. 상단 1.05인치는 헤더 밴드 영역이다(본문은 y >= 1.25부터).
-- 좌우 여백 0.8인치를 지켜라. 즉 본문 가용 폭은 x 0.8 ~ {SXMAX}.
-- 요소 간 간격은 0.3~0.5인치. 요소가 슬라이드 밖으로 나가면 안 된다.
+[캔버스 · 본문 박스 — 이 숫자를 그대로 써라]
+- 슬라이드는 {SW} x {SH} 인치. 상단 {HEADER_H}인치는 헤더 밴드, 하단 0.62인치는 푸터다(둘 다 addHeader가 알아서 그린다).
+- **본문 박스 = x {MARGIN} ~ {SXMAX}, y {BODY_TOP} ~ {BODY_BOTTOM}** (폭 {BODYL['w']:.2f} × 높이 {BODYL['h']:.2f} 인치).
+- 좌우 여백은 좌·우 똑같이 {MARGIN}. 오른쪽이 더 비면 안 된다(차트 폭도 {BODYL['w']:.2f}로).
+- 요소 간 간격 0.3~0.4인치. 슬라이드 밖으로 나가면 안 된다.
+
+[가장 흔한 실패 — 절대 이러지 마라]
+지난 산출물의 실제 문제였다. 반복하면 검사에서 반려된다.
+1. **아래가 텅 빔.** 카드를 y=2.0에 높이 2.0으로 놓고 끝내서 화면 아래 45%가 백지였다.
+   → 본문 요소의 **최하단(y+h)은 반드시 {BODY_BOTTOM} 근처(최소 6.3)**여야 한다.
+   내용이 짧아도 카드를 작게 만들지 말고 **본문 박스를 꽉 채우도록 카드를 키우고**,
+   짧은 글은 카드 안에서 valign으로 위치를 잡아라. 빈 화면보다 큰 카드가 낫다.
+2. **검은 테두리.** 도형에 line을 주지 않으면 파워포인트가 기본 검은 윤곽선을 그린다.
+   → 모든 addShape에 `line: {{ type: "none" }}`를 반드시 넣어라. 테두리 색을 직접 지정하지 마라.
+3. **가로 쏠림.** 왼쪽만 쓰고 오른쪽을 비우지 마라(사진 자리인 경우만 예외).
+4. **맹탕 카드.** 카드 안에 4~6단어짜리 조각글만 넣지 마라. 소제목 + 한두 문장(또는 불릿 2~3개).
 
 [타이포]
-- 슬라이드 제목 24~30pt bold, 소제목 16~20pt bold, 본문 12~15pt, 캡션 10~11pt.
-- 큰 수치 강조는 36~54pt bold. 본문은 왼쪽 정렬(제목만 가운데 허용).
-- 글자가 넘치지 않게 상자 크기를 넉넉히 잡아라. 한 상자에 5줄 이상 넣지 마라.
+- 슬라이드 제목 24~28pt bold(addHeader가 처리), 카드 소제목 17~20pt bold, 본문 12~15pt, 캡션 10~11pt.
+- 큰 수치 강조는 36~54pt bold. 본문은 왼쪽 정렬(제목·수치만 가운데 허용).
+- 불릿은 리터럴 '•' 금지. `bulletRuns(["항목1","항목2"])`를 addText에 넘겨라(둘째 줄이 안 밀려 올라온다).
 
 [색 — 반드시 이 값만 써라]
 const C = {json.dumps(C, ensure_ascii=False)};
 const F = {json.dumps(F, ensure_ascii=False)};
-- 색은 '#' 없이 6자리 문자열. 배경 위 글자는 대비를 확인해서 골라라(어두운 배경엔 C.white).
+- 색은 '#' 없이 6자리 문자열. 팔레트에 없는 색(예: D1DBEE)을 새로 지어내지 마라.
+- 카드 배경은 C.cardBg, 본문 배경은 C.body, 강조는 C.brand, 본문 글자는 C.gray.
 {asset_block}{media_block}
-[쓸 수 있는 헬퍼 — 써도 되고 직접 그려도 된다]
-  addHeader(s, "제목", THEME_INFO, ASSETS_DIR)             상단 밴드 + 제목
+[헬퍼 — 카드·수치·비교·차트는 반드시 이 헬퍼로 그려라(직접 addShape로 카드를 만들지 마라)]
+  addHeader(s, "제목", THEME_INFO, ASSETS_DIR, "한 줄 요약", DECOR[n] 또는 null)
+        └ 배경 장식 + 밴드 + 제목 + 리드 + 푸터(페이지 번호)를 한 번에. 본문 슬라이드는 무조건 이걸로 시작.
   addCover(prs, "제목", "부제", "발표자", THEME_INFO, ASSETS_DIR)
-  addChart(s, "제목", chartData, THEME_INFO, prs, rect)     rect={{x,y,w,h}}
-  addSlideImage(s, imgPath, {{mode,transparency,x,y,w,h}})
-  addGradientPanel(s, gradPath, {{x,y,w,h}})
-  fitText(text, wIn, hIn, base, min) → 글자 크기 계산
-표지는 addCover, 본문 상단은 addHeader를 쓰는 게 안전하다. 그 아래 본문은 직접 설계하라.
+  addCards(s, [{{title, body}} | {{title, items:[...]}}], THEME_INFO, rect)   카드 그리드(영역을 꽉 채움)
+  addCard(s, {{x,y,w,h,title,body,items,tone:"light|solid|ghost"}}, THEME_INFO)  카드 하나를 직접 배치
+  addStats(s, [{{num:"90%+", label:"짧은 라벨", desc:"한 줄 설명"}}], THEME_INFO, rect)
+  addCompare(s, leftCol, rightCol, THEME_INFO, rect)
+  addChart(s, "제목", chartData, THEME_INFO, prs, rect)
+  addSlideImage(s, IMG[n], {{x,y,w,h}})   addDecor(s, DECOR[n])
+  bulletRuns(items) / fitText(text, wIn, hIn, base, min) / mix(colorA, colorB, t)
+rect를 생략하면 본문 박스 전체({BODYL['x']}, {BODYL['y']}, {BODYL['w']:.2f}, {BODYL['h']:.2f})를 쓴다.
+배치 설계(몇 개를 어떻게 나눌지, 어느 쪽에 사진을 둘지)는 네 몫이다. 스타일은 헬퍼에 맡겨라.
 
 [반드시 지킬 것]
-- 사진이 있는 슬라이드는 **사진 자리를 비워라.** 카드·도형이 사진을 덮으면 안 된다.
-- 그라데이션 패널은 콘텐츠보다 **먼저** 그려라(나중에 그리면 내용을 덮는다).
+- 모든 본문 슬라이드는 `addHeader(s, 제목, THEME_INFO, ASSETS_DIR, 리드문, DECOR[n]||null)` 로 시작하라
+  (기획안의 lead를 그대로 넣어라. 배경 장식도 이 인자로만 넘긴다).
+- 사진이 있는 슬라이드는 **사진 자리를 비워라.** 사진이 왼쪽이면 카드 rect는 오른쪽 절반으로 주어라.
 - 도형 타입은 문자열로: s.addShape('roundRect', ...) / 'rect'. pptxgen.ShapeType 접근 금지.
 - rectRadius는 roundRect에서만. 그림자 offset >= 0.
-- CSS 그라데이션 채움을 쓰지 마라(pptxgenjs 미지원). 그라데이션은 addGradientPanel만.
+- CSS 그라데이션 채움을 쓰지 마라(pptxgenjs 미지원).
 - 슬라이드 개수는 기획안과 같게. 내용을 빠뜨리지 마라.
 - 한국어로 쓰되 한자·일본어를 섞지 마라.
 {brief_block}
@@ -785,7 +833,7 @@ def _extract_js_body(response: str) -> str:
         raise ValueError("addSlide 호출이 없다")
     # 헤더에서 이미 선언한 것들을 모델이 또 선언하면 SyntaxError가 난다.
     drop = re.compile(
-        r"^\s*(?:var|let|const)\s+(?:path|pptxgen|prs|THEME_INFO|ASSETS_DIR|A|C|F|IMG|GRAD|useImages)\s*=|"
+        r"^\s*(?:var|let|const)\s+(?:path|pptxgen|prs|THEME_INFO|ASSETS_DIR|A|C|F|IMG|GRAD|DECOR|useImages)\s*=|"
         r"^\s*(?:const|var|let)\s*\{[^}]*\}\s*=\s*require\(|"
         r"^\s*require\(|^\s*prs\.layout\s*=|^\s*module\.exports")
     lines = [ln for ln in text.splitlines() if not drop.match(ln)]
