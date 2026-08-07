@@ -321,7 +321,8 @@ def _resolve_media(plan: dict, theme_info: dict, user_images: dict = None) -> di
                 img["path"] = src
             elif img.get("query"):
                 try:
-                    p = image_search.fetch_image(img["query"])
+                    # 배경으로 깔 이미지는 차분한 것을 골라야 그 위 글자가 읽힌다.
+                    p = image_search.fetch_image(img["query"], mode=img.get("mode", "region"))
                     if p:
                         img["path"] = p
                 except Exception as e:
@@ -541,29 +542,54 @@ def _generate_by_code(plan: dict, out_pptx: str, assets_dir: str,
                    if isinstance(sl.get("image"), dict) and sl["image"].get("path")],
     }
 
+    SYS = ("You are an expert pptxgenjs developer and presentation designer. "
+           "Output only runnable JavaScript.")
     prompt = _code_prompt(plan, assets_dir, theme_info, brief)
-    messages = [
-        {"role": "system", "content": "You are an expert pptxgenjs developer and presentation designer. Output only runnable JavaScript."},
-        {"role": "user", "content": prompt},
-    ]
+    prev_js, feedback = None, None
 
     for rnd in range(1, max_rounds + 1):
-        resp = client.chat.completions.create(model=model_name, temperature=0.2, messages=messages)
+        # 대화를 누적하지 않는다. 회차마다 [지시 + 직전 코드 + 지적]만 보낸다.
+        # 누적하면 3회차쯤에서 Groq 무료 티어 TPM(8000)을 넘겨 413이 난다.
+        messages = [{"role": "system", "content": SYS},
+                    {"role": "user", "content": prompt}]
+        if prev_js and feedback:
+            messages += [{"role": "assistant", "content": prev_js[:6000]},
+                         {"role": "user", "content": feedback}]
+
+        try:
+            resp = client.chat.completions.create(model=model_name, temperature=0.2, messages=messages)
+        except Exception as e:
+            msg = str(e)
+            if "rate_limit" in msg or "429" in msg or "413" in msg:
+                # 한도에 걸리면 직전 코드를 떼고 지시만으로 한 번 더 시도한다.
+                print(f"[freeform_engine] {rnd}회차 요청 한도 초과 → 문맥을 줄여 재시도")
+                try:
+                    resp = client.chat.completions.create(
+                        model=model_name, temperature=0.2,
+                        messages=[{"role": "system", "content": SYS},
+                                  {"role": "user", "content": prompt}])
+                except Exception as e2:
+                    print(f"[freeform_engine] 재시도도 실패: {e2}")
+                    return False
+            else:
+                print(f"[freeform_engine] 코드 생성 호출 실패: {e}")
+                return False
+
         raw = resp.choices[0].message.content or ""
         try:
             js = _extract_js_body(raw)
         except ValueError as e:
-            messages += [{"role": "assistant", "content": raw[:2000]},
-                         {"role": "user", "content": f"코드를 못 찾았다({e}). 설명 없이 JS 코드만 다시 출력하라."}]
+            prev_js, feedback = None, None
+            print(f"[freeform_engine] {rnd}회차 코드 추출 실패({e})")
             continue
 
         try:
             _run_js(js, out_pptx, assets_dir, theme_info, media)
         except Exception as e:
             print(f"[freeform_engine] 자유 설계 {rnd}회차 실행 실패 → 재작성 요청")
-            messages += [{"role": "assistant", "content": js[:6000]},
-                         {"role": "user", "content":
-                          f"위 코드가 실행 중 실패했다:\n{e}\n\n원인을 고쳐 전체 코드를 다시 출력하라. 설명 없이 코드만."}]
+            prev_js = js
+            feedback = (f"위 코드가 실행 중 실패했다:\n{str(e)[:900]}\n\n"
+                        "원인을 고쳐 전체 코드를 다시 출력하라. 설명 없이 코드만.")
             continue
 
         problems = deck_lint.lint(out_pptx, expect)
@@ -579,10 +605,9 @@ def _generate_by_code(plan: dict, out_pptx: str, assets_dir: str,
             return False
 
         print(f"[freeform_engine] 자유 설계 {rnd}회차 기하 결함 {len(problems)}건 → 수정 요청")
-        messages += [{"role": "assistant", "content": js[:6000]},
-                     {"role": "user", "content":
-                      "생성된 덱을 검사하니 아래 문제가 있다. 해당 슬라이드의 좌표·크기를 고쳐 "
-                      "전체 코드를 다시 출력하라. 설명 없이 코드만.\n- " + "\n- ".join(problems)}]
+        prev_js = js
+        feedback = ("생성된 덱을 검사하니 아래 문제가 있다. 해당 슬라이드의 좌표·크기를 고쳐 "
+                    "전체 코드를 다시 출력하라. 설명 없이 코드만.\n- " + "\n- ".join(problems[:8]))
     return False
 
 
@@ -676,7 +701,7 @@ const F = {json.dumps(F, ensure_ascii=False)};
 - 한국어로 쓰되 한자·일본어를 섞지 마라.
 {brief_block}
 [기획안]
-{json.dumps(plan, ensure_ascii=False, indent=1)[:24000]}
+{json.dumps(plan, ensure_ascii=False, separators=(',', ':'))[:9000]}
 
 [출력 형식]
 설명·마크다운 없이 **실행 가능한 JavaScript 본문만** 출력하라.
