@@ -23,10 +23,14 @@
       </nav>
       <div class="spacer"></div>
       <button class="btn btn-util" style="margin-bottom:10px;width:100%" onclick="openHelp()">❓ 사용 가이드</button>
+      <button class="btn btn-util" style="margin-bottom:10px;width:100%" onclick="openApiModal()">🔑 API 키 설정</button>
       <button id="themeBtn" class="btn btn-util" style="margin-bottom:10px;width:100%">☀️ 라이트로</button>
       <label style="font-size:11px;color:var(--ink-faint);display:block;margin-bottom:3px">AI 모델</label>
       <select id="modelSel" class="modelsel" onchange="onModelChange()"></select>
       <div class="status" style="margin-top:10px">엔진 · <b id="llmStatus">…</b><br>이미지 · <b id="imgStatus">…</b></div>
+      <div class="byline">
+        made by <b>지우가람</b><br>감바랩스 오피스 AI 자동화
+      </div>
     </aside>
 
     <main class="content">
@@ -400,6 +404,62 @@
     </main>
   </div>
   <!-- 테마 추가/제작 모달 -->
+  <!-- API 키 설정 -->
+  <div id="apiModal" class="modal hidden" onclick="if(event.target===this)closeApiModal()">
+    <div class="modal-card" style="width:560px;max-width:94vw">
+      <div class="modal-head">
+        <h3>🔑 API 키 설정</h3><button class="modal-x" onclick="closeApiModal()">✕</button>
+      </div>
+      <div class="hint">키는 이 컴퓨터의 <span class="mono" id="apiEnvPath">.env</span> 파일에만 저장됩니다.
+        저장하면 <b>재시작 없이 바로 적용</b>됩니다.</div>
+
+      <label class="fld">사용할 엔진
+        <select id="apiProvider" onchange="apiSwitchGroup()">
+          <option value="groq">Groq — 빠르고 무료 티어 있음 (권장)</option>
+          <option value="openai">OpenAI — GPT-4o 등</option>
+          <option value="ollama">Ollama — 이 PC에서 로컬 실행 (키 불필요)</option>
+        </select>
+      </label>
+
+      <div id="apiGroq" class="api-group">
+        <label class="fld">Groq API 키
+          <input id="apiGroqKey" type="password" placeholder="gsk_..." autocomplete="off">
+        </label>
+        <label class="fld">Groq 보조 키 <span style="color:var(--ink-faint)">(선택 · 한도 초과 시 자동 전환)</span>
+          <input id="apiGroqKey2" type="password" placeholder="비워도 됩니다" autocomplete="off">
+        </label>
+        <div class="hint">키 발급: <span class="mono">console.groq.com/keys</span></div>
+      </div>
+
+      <div id="apiOpenai" class="api-group hidden">
+        <label class="fld">OpenAI API 키
+          <input id="apiOpenaiKey" type="password" placeholder="sk-..." autocomplete="off">
+        </label>
+        <label class="fld">모델<input id="apiOpenaiModel" placeholder="gpt-4o"></label>
+      </div>
+
+      <div id="apiOllama" class="api-group hidden">
+        <label class="fld">Ollama 주소<input id="apiBaseUrl" placeholder="http://localhost:11434/v1"></label>
+        <label class="fld">모델<input id="apiOllamaModel" placeholder="qwen2.5:7b-instruct"></label>
+        <div class="hint">이 PC에 Ollama가 실행 중이어야 합니다. 키는 필요 없습니다.</div>
+      </div>
+
+      <details class="api-more">
+        <summary>이미지 검색 키 (선택)</summary>
+        <label class="fld">Pexels API 키<input id="apiPexels" type="password" placeholder="비우면 Openverse 사용(키 불필요)"
+            autocomplete="off"></label>
+      </details>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-primary" style="flex:1" onclick="apiSave()">저장</button>
+        <button class="btn btn-util" onclick="apiTest()">연결 확인</button>
+      </div>
+      <div id="apiResult" class="result hidden"></div>
+      <div class="hint" style="margin-top:10px">이미 저장된 키는 <b>●●●</b> 로 표시됩니다. 그대로 두면 유지되고,
+        바꾸려면 새 키를 입력하세요. 지우려면 <span class="mono">-</span> 한 글자만 넣고 저장하세요.</div>
+    </div>
+  </div>
+
   <div id="themeModal" class="modal hidden" onclick="if(event.target===this)closeThemeModal()">
     <div class="modal-card">
       <div class="modal-head">

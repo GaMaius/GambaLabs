@@ -4,15 +4,38 @@
 
 ## 0. 프로젝트 목표
 감바랩스(온디바이스 음성인식 KWS 회사 "WordSense")의 **사내 오피스 업무 자동화 데스크톱 앱**.
-인턴(가람)이 맡은 과제 "PowerPoint/Excel LLM 활용 시나리오 설계·구현"의 결과물.
+**제작: 지우가람(Jiwoo Garam)** — 인턴 과제 "PowerPoint/Excel LLM 활용 시나리오 설계·구현"의 결과물.
 - 핵심 원칙: **LLM은 '무엇을' 판단, 실제 파일 수술(디자인·수식·차트)은 결정적 코드.** (검증된 도구를 엮어 신뢰도↑, human-in-the-loop)
 - 데이터 주권: 로컬/사내 LLM로 대외비 문서 외부 전송 0. 데모는 로컬 Ollama.
 
-## 1. 실행
+## 1. 실행 · 빌드
 ```
-run_app.bat                 # 또는:
-python -m app.main_app      # (프로젝트 루트에서)
+run_app.bat                        # 또는:
+python -m app.main_app             # (프로젝트 루트에서)
+python -m app.main_app --selftest  # 창 없이 환경 점검 → output/_selftest.txt
+python main.py paths               # 경로·Node 상태만 빠르게
+python tools/build_exe.py --clean  # 인수인계용 자립 실행 폴더 → dist/GambaLabsOffice/
 ```
+
+### 경로 규칙 (중요) — `src/common/paths.py`
+모든 경로는 여기 한 곳에서 나온다. **모듈마다 `dirname()`을 겹쳐 쓰지 말 것.**
+예전엔 각자 3중 `dirname`으로 루트를 계산해서, 폴더를 한 칸만 옮기거나 exe로 묶으면 조용히 어긋났다.
+
+| 상수 | 소스 실행 | exe 실행 | 용도 |
+|---|---|---|---|
+| `RES_DIR` | 프로젝트 루트 | `_internal/`(_MEIPASS) | 읽기 전용 — 에셋·JS·번들 코드 |
+| `DATA_DIR` | 프로젝트 루트 | **exe 옆 폴더** | 쓰기 — `output/`, `themes/`, `.env` |
+
+- 둘을 섞으면 빌드본이 읽기 전용 폴더에 쓰려다 실패하거나, 임시 폴더에 써서 앱을 끄면 결과물이 사라진다.
+- Node는 `paths.node_exe()`(번들 `runtime/node` 우선 → 없으면 PATH) / `paths.node_cwd()`(node_modules 위치).
+  subprocess로 node를 부를 땐 **반드시 이 둘을 쓴다.** `cwd`를 틀리면 `Cannot find module pptxgenjs`로 죽는다.
+- 캐시(그라데이션·배경장식·스톡이미지)는 전부 `output/_cache/` 아래. 패키지 안에 쓰지 않는다.
+- 사용자 테마는 `DATA_DIR/themes/`. 예전 위치(`app/ppt/themes`)는 `thememgr._migrate_legacy()`가 옮긴다.
+
+### API 키 설정
+앱 좌측 **🔑 API 키 설정** → 입력 → 저장. `DATA_DIR/.env`에 쓰고 `os.environ`도 갱신해서
+**재시작 없이 즉시 적용**된다(`src/common/envfile.py`). `llm_client`는 매 호출 `os.getenv`를 읽으므로 이걸로 충분.
+빈 칸은 '변경 없음', `-` 한 글자는 삭제 — 마스킹된 값을 되보내 키가 날아가는 걸 막으려는 규칙이다.
 - pywebview 데스크톱 앱(HTML/CSS/JS UI + Python js_api). Windows=Edge WebView2.
 - 종료: 앱 창 닫기. 콘솔의 pywebview 로그는 억제됨(main_app.py에서 logger CRITICAL).
 - **주의(중요 버그 이력)**: `Api` 객체에 창을 붙일 땐 반드시 `self._window`(밑줄). 공개 속성으로 두면
@@ -111,12 +134,16 @@ LibreOffice 설치 완료(`C:\Program Files\LibreOffice\program\soffice.exe`) + 
 ## 5. 검증된 사실 / 한계
 - 로컬 모델 천장: 7b는 metrics/compare 설계 가능(느림 ~5분), 3b는 예시 없는 새 입력에서 붕괴(빈 결과→규칙 폴백).
   → 목표급(`planing/클로드 버전.pptx` 12장)엔 회사 GPT 필요. 이게 정직한 결론.
-- 시각 QA 제약: LibreOffice 미설치라 덱을 이미지로 못 봄 → 사용자 PowerPoint 확인 의존. python-pptx로 구조는 검증 가능.
-- 샘플 픽스처: `planing/`(sample_*.pptx/xlsx/txt, 클로드 버전.pptx=목표품질, 샘플로 넣은 버전.pptx=러프 입력).
+- 시각 QA: LibreOffice 설치 완료 → `deck_render.to_images()`로 덱을 눈으로 본다(3-1절). **작업 후 반드시 렌더할 것.**
+- 샘플 픽스처는 프로젝트 **바깥**(`../planing/`)에 있다. 코드에서 기본값으로 참조하지 마라 —
+  폴더째 전달하면 그 경로가 없어 바로 깨진다(옛 `ppt_engine`/`pptx_import`/`excel_analysis`가 그랬고, 제거했다).
 
-## 6. 스택
-Python 3.11: pywebview 6.2.1, openai 2.x, openpyxl, pandas, python-pptx, Pillow(+heif/avif), reportlab, vtracer, requests, python-dotenv.
-Node: pptxgenjs, @resvg/resvg-js. 에셋: `ppt-skill/assets/`(로고·배경), 스킬 가이드 `ppt-skill/*.md`, `THEME_AUTHORING.md`.
+## 6. 스택 · 폴더
+Python 3.11 — 전체 목록은 `requirements.txt`(주석에 용도 표기). 무거운 셋(`opencv`/`scikit-image`/`rembg`)은 **벡터 탭 전용**.
+Node — `pptxgenjs`, `@resvg/resvg-js`. 에셋 `ppt-skill/assets/`, 가이드 `ppt-skill/*.md`.
+빌드 — PyInstaller onedir + Node 런타임 동봉. 자세한 건 `tools/BUILD.md`.
+
+실행 중 만들어지는 폴더(소스 관리 대상 아님, gitignore됨): `output/`(결과물·`_cache/`·`_tmp/`), `themes/`(사용자 테마), `dist/`·`build/`(빌드).
 
 ## 7. 진행 중 — 디자인 입력 폼 강화 (IMPROVEMENTS.md 참고)
 "퀄리티·자유도·UI/UX" 목표로 폼을 개편 중. 착수 시점 스냅샷:
@@ -126,6 +153,7 @@ Node: pptxgenjs, @resvg/resvg-js. 에셋: `ppt-skill/assets/`(로고·배경), �
 
 ## 8. 백로그 (미완)
 - 7b 설계 실수(1:1 매핑·오분류) 추가 완화 / 회사 GPT 연동 시 freeform 실검증
-- 팀장님 PDF 보고서에 경쟁툴+3b/7b 벤치마크 반영 / PyInstaller .exe 패키징 / Word(docx) 탭
+- 팀장님 PDF 보고서에 경쟁툴+3b/7b 벤치마크 반영 / Word(docx) 탭
+- (완료) PyInstaller .exe 패키징 — `tools/build_exe.py`, 경로 단일화(`src/common/paths.py`), 앱 내 API 키 설정
 - 테마 업로드·제작 실제 앱 클릭 테스트(현재 DOM 검증만)
 - 플로팅 편집기: 현재 숨김. PPT 임베드 편집은 pywebview 한계로 보류.

@@ -125,8 +125,18 @@ def _job(job_path):
     print(json.dumps({"ok": True, "best": best, "tried": tried}, ensure_ascii=False))
 
 
+def run_job(job_path: str) -> int:
+    """job.json 하나를 처리한다. 빌드본에서 exe가 자기 자신을 작업자로 부를 때도 이 함수를 쓴다."""
+    try:
+        _job(job_path)
+        return 0
+    except Exception as e:
+        print(json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}, ensure_ascii=False))
+        return 1
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1].lower().endswith(".json"):
-        _job(sys.argv[1])
+        raise SystemExit(run_job(sys.argv[1]))
     else:
         _legacy()

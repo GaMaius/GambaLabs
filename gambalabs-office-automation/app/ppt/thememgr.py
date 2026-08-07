@@ -11,8 +11,31 @@ import re
 import json
 from typing import Dict, Any, List, Optional
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-THEMES_DIR = os.path.join(HERE, "themes")
+from src.common import paths
+
+# 사용자 테마는 **쓰기 가능한 작업 폴더**에 둔다. 패키지 안(app/ppt/themes)에 두면
+# exe로 묶었을 때 읽기 전용 임시 폴더가 되어 저장이 조용히 실패한다.
+THEMES_DIR = paths.USER_THEMES_DIR
+_LEGACY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "themes")
+
+
+def _migrate_legacy():
+    """예전 위치(app/ppt/themes)에 있던 테마를 새 위치로 한 번만 옮긴다."""
+    if not os.path.isdir(_LEGACY_DIR):
+        return
+    os.makedirs(THEMES_DIR, exist_ok=True)
+    for f in os.listdir(_LEGACY_DIR):
+        if not f.endswith(".json"):
+            continue
+        dst = os.path.join(THEMES_DIR, f)
+        if not os.path.exists(dst):
+            try:
+                os.replace(os.path.join(_LEGACY_DIR, f), dst)
+            except OSError:
+                pass
+
+
+_migrate_legacy()
 
 # 내장 테마(설정 본체는 render_deck.js). 여기선 선택기용 메타데이터만.
 BUILTIN = [

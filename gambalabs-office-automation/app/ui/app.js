@@ -374,6 +374,74 @@ async function openFloat() {
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
 }
 
+/* ── API 키 설정 ──
+   키는 .env 파일에만 저장한다. 이미 저장된 키는 마스킹해서 placeholder로만 보여주고,
+   입력란은 항상 비워 둔다 → 빈 칸으로 저장하면 기존 값이 유지된다(실수로 날리는 것 방지). */
+const API_GROUPS = { groq: "apiGroq", openai: "apiOpenai", ollama: "apiOllama" };
+
+async function openApiModal() {
+  $("apiModal").classList.remove("hidden");
+  $("apiResult").classList.add("hidden");
+  ["apiGroqKey", "apiGroqKey2", "apiOpenaiKey", "apiPexels"].forEach((id) => ($(id).value = ""));
+  try {
+    const s = await api().settings_get();
+    $("apiEnvPath").textContent = s._path || ".env";
+    $("apiProvider").value = s._provider || "groq";
+    const ph = (id, f) => {
+      const v = s[f];
+      $(id).placeholder = v && v.set ? `${v.display}  (저장됨 · 그대로 두면 유지)` : $(id).placeholder;
+    };
+    ph("apiGroqKey", "GROQ_API_KEY"); ph("apiGroqKey2", "GROQ_API_KEY2");
+    ph("apiOpenaiKey", "OPENAI_API_KEY"); ph("apiPexels", "PEXELS_API_KEY");
+    $("apiOpenaiModel").value = (s.OPENAI_MODEL && s.OPENAI_MODEL.display) || "";
+    $("apiOllamaModel").value = (s.OPENAI_MODEL && s.OPENAI_MODEL.display) || "";
+    $("apiBaseUrl").value = (s.OPENAI_BASE_URL && s.OPENAI_BASE_URL.display) || "";
+    apiSwitchGroup();
+  } catch (e) { show($("apiResult"), `<span class="err">${esc(e.message || e)}</span>`); }
+}
+function closeApiModal() { $("apiModal").classList.add("hidden"); }
+
+function apiSwitchGroup() {
+  const p = $("apiProvider").value;
+  Object.entries(API_GROUPS).forEach(([k, id]) => $(id).classList.toggle("hidden", k !== p));
+}
+
+async function apiSave() {
+  const p = $("apiProvider").value;
+  const vals = { LLM_PROVIDER: p, PEXELS_API_KEY: $("apiPexels").value };
+  if (p === "groq") {
+    vals.GROQ_API_KEY = $("apiGroqKey").value;
+    vals.GROQ_API_KEY2 = $("apiGroqKey2").value;
+  } else if (p === "openai") {
+    vals.OPENAI_API_KEY = $("apiOpenaiKey").value;
+    vals.OPENAI_MODEL = $("apiOpenaiModel").value;
+    vals.OPENAI_BASE_URL = "-";                 // 공식 엔드포인트로 되돌린다
+  } else {
+    vals.OPENAI_BASE_URL = $("apiBaseUrl").value || "http://localhost:11434/v1";
+    vals.OPENAI_MODEL = $("apiOllamaModel").value;
+  }
+  const box = $("apiResult");
+  spin(box, "저장 중…");
+  try {
+    const r = await api().settings_save(vals);
+    if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); return; }
+    show(box, `<span class="ok">✅ 저장했어요.</span> 바로 적용됩니다 · <span class="mono">${esc(r.path)}</span>`);
+    ["apiGroqKey", "apiGroqKey2", "apiOpenaiKey", "apiPexels"].forEach((id) => ($(id).value = ""));
+    initStatus();
+  } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
+}
+
+async function apiTest() {
+  const box = $("apiResult");
+  spin(box, "연결 확인 중…");
+  try {
+    const r = await api().settings_test();
+    show(box, r.ok
+      ? `<span class="ok">✅ 연결됨</span> — 모델 <span class="mono">${esc(r.model)}</span>`
+      : `<span class="err">연결 실패: ${esc(r.error)}</span>`);
+  } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
+}
+
 /* ── 사용 가이드(온보딩) ── */
 function openHelp() { $("helpModal").classList.remove("hidden"); }
 function closeHelp() { $("helpModal").classList.add("hidden"); }

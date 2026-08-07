@@ -22,9 +22,10 @@ try:
 except Exception:
     _ssim = None
 
+from src.common import paths
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 RASTER_JS = os.path.join(HERE, "_svg_raster.js")
-PROJECT_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 
 _NODE_OK = None
 
@@ -38,8 +39,8 @@ def node_available() -> bool:
     if not os.path.exists(RASTER_JS):
         return False
     try:
-        r = subprocess.run(["node", "-e", "require('@resvg/resvg-js');console.log('ok')"],
-                           cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=30)
+        r = subprocess.run([paths.node_exe(), "-e", "require('@resvg/resvg-js');console.log('ok')"],
+                           cwd=paths.node_cwd(), capture_output=True, text=True, timeout=30)
         _NODE_OK = (r.returncode == 0 and "ok" in (r.stdout or ""))
     except Exception:
         _NODE_OK = False
@@ -50,8 +51,8 @@ def rasterize(svg_path: str, out_png: str, width: int, timeout: int = 120) -> bo
     # cwd를 프로젝트 루트로 두고 실행하므로(node_modules 해석) 경로는 반드시 절대경로로.
     svg_path, out_png = os.path.abspath(svg_path), os.path.abspath(out_png)
     try:
-        r = subprocess.run(["node", RASTER_JS, svg_path, out_png, str(int(width))],
-                           cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run([paths.node_exe(), RASTER_JS, svg_path, out_png, str(int(width))],
+                           cwd=paths.node_cwd(), capture_output=True, text=True, timeout=timeout)
         return r.returncode == 0 and os.path.exists(out_png)
     except Exception:
         return False

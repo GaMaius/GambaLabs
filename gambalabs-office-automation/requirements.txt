@@ -1,13 +1,31 @@
-openai>=1.0.0
-openpyxl>=3.1.0
-pydantic>=2.0.0
+# 감바랩스 오피스 AI — 파이썬 의존성
+# 설치:  pip install -r requirements.txt
+# (Node 의존성은 별도:  npm install)
+
+# ── 앱 · 공통 ─────────────────────────────
+pywebview>=5.0            # 데스크톱 창(Windows=Edge WebView2)
 python-dotenv>=1.0.0
+openai>=1.0.0             # Groq/OpenAI/Ollama 공통 클라이언트
+pydantic>=2.0.0
+requests>=2.31.0
+
+# ── 오피스 문서 ───────────────────────────
+openpyxl>=3.1.0           # 엑셀 수술(수식·차트 보존)
+pandas>=2.0.0             # 엑셀 분석·요약
+python-pptx>=1.0.0        # PPT 읽기(가져오기) · 생성물 구조 검증
+python-docx>=1.1.0        # 워드 문서 읽기
+
+# ── 이미지 · 덱 시각 검증 ─────────────────
 Pillow>=10.0.0
+pillow-heif               # 아이폰 HEIC 입력
+pillow-avif-plugin        # AVIF 입력
+pypdfium2                 # pptx→pdf→png 렌더(LibreOffice와 함께 사용)
+
+# ── 벡터 변환 탭 ──────────────────────────
+# 이 셋은 벡터 탭에서만 쓴다. 용량이 크므로(onnxruntime 등)
+# 벡터 기능이 필요 없으면 빼도 나머지는 정상 동작한다.
 vtracer
 opencv-python>=4.8.0
 numpy>=1.24.0
 scikit-image>=0.22.0
-pypdfium2   # 덱을 이미지로 렌더해 눈으로 검증(LibreOffice와 함께)
-pillow-heif
-pillow-avif-plugin
-rembg[cpu]
+rembg[cpu]                # 배경 제거(U²-Net)

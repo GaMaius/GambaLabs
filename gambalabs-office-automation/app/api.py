@@ -9,9 +9,10 @@ import sys
 import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.dirname(HERE)
-if PROJECT_DIR not in sys.path:
-    sys.path.insert(0, PROJECT_DIR)
+if os.path.dirname(HERE) not in sys.path:
+    sys.path.insert(0, os.path.dirname(HERE))
+
+from src.common import paths
 
 from src.common.llm_client import get_llm_client_and_model, get_llm_provider, list_available_models
 from src.excel.llm_extractor import LLMExtractor
@@ -35,7 +36,8 @@ try:
 except Exception:
     pass
 
-OUTPUT = os.path.join(PROJECT_DIR, "output")
+OUTPUT = paths.OUTPUT_DIR
+paths.ensure_dirs()
 
 def _ts(name, ext, sub_dir=""):
     """타임스탬프 파일명 생성 및 서브 폴더 지정"""
@@ -77,8 +79,42 @@ class Api:
         return r[0] if r else ""
 
     def project_dir(self):
-        """실험 로거(gamba_log) 스니펫에 넣을 프로젝트 폴더 경로."""
-        return PROJECT_DIR
+        """실험 로거(gamba_log) 스니펫에 넣을 작업 폴더 경로."""
+        return paths.DATA_DIR
+
+    def path_info(self):
+        """진단용 — 어느 폴더를 보고 있는지, node가 준비됐는지."""
+        return paths.describe()
+
+    # ── API 키 설정(앱 안에서 .env 편집) ─────────────
+    def settings_get(self):
+        from src.common import envfile
+        d = envfile.read_all()
+        d["_provider"] = get_llm_provider()
+        d["_node_ready"] = paths.node_ready()
+        return d
+
+    def settings_save(self, values):
+        """빈 칸은 '변경 없음', "-"는 삭제. 저장 즉시 적용된다(재시작 불필요)."""
+        from src.common import envfile
+        try:
+            r = envfile.save(values or {})
+            r["status"] = self.llm_status()
+            return r
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+
+    def settings_test(self):
+        """현재 키로 실제 한 번 호출해 본다. 인수인계 받은 사람이 바로 확인할 수 있게."""
+        try:
+            client, model = get_llm_client_and_model()
+            r = client.chat.completions.create(
+                model=model, max_tokens=5,
+                messages=[{"role": "user", "content": "ping"}])
+            txt = (r.choices[0].message.content or "").strip()
+            return {"ok": True, "model": model, "reply": txt[:40] or "(빈 응답)"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)[:300]}
 
     def open_folder(self, path):
         try:
@@ -88,8 +124,20 @@ class Api:
         return True
 
     def llm_status(self):
+        # 키가 없으면 모델 이름을 보여줘 봐야 소용없다. 무엇을 해야 하는지 알려 준다.
+        if not self._has_key():
+            return "키 미설정 — 좌측 '🔑 API 키 설정'에서 입력하세요"
         info = list_available_models()
         return f"{info['label']} ({info['current']})"
+
+    @staticmethod
+    def _has_key():
+        p = get_llm_provider()
+        if p == "ollama":
+            return True                      # 로컬 실행이라 키가 필요 없다
+        if p == "groq":
+            return bool(os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY2"))
+        return bool(os.getenv("OPENAI_API_KEY"))
 
     def img_status(self):
         try:
@@ -776,11 +824,16 @@ class Api:
                 json.dump(job, f, ensure_ascii=False)
 
             # ── 5) 별도 프로세스 실행(시간제한 없음 — '중지' 버튼으로 취소) ──
-            runner = os.path.join(HERE, "ppt", "_vtrace_run.py")
+            # 소스 실행이면 python으로 러너 스크립트를, 빌드본이면 exe가 자기 자신을
+            # 작업자 모드로 재실행한다(빌드본에는 python.exe가 없다).
+            if paths.IS_FROZEN:
+                cmd = [sys.executable, "--vtrace", job_path]
+            else:
+                cmd = [sys.executable, os.path.join(HERE, "ppt", "_vtrace_run.py"), job_path]
             self._vec_cancelled = False
             # 파이프는 UTF-8 고정 — 한글 후보 라벨이 cp949 콘솔 인코딩에 깨지지 않도록.
             env = dict(os.environ, PYTHONIOENCODING="utf-8")
-            proc = subprocess.Popen([sys.executable, runner, job_path],
+            proc = subprocess.Popen(cmd,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                     text=True, encoding="utf-8", errors="replace", env=env)
             self._vec_proc = proc

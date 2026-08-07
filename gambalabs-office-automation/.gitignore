@@ -6,3 +6,7 @@ output/
 inbox/_processed/
 app/ppt/_gradcache/
 app/ppt/_decorcache/
+dist/
+build/
+themes/
+*.spec

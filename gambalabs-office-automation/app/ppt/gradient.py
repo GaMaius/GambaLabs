@@ -7,7 +7,9 @@ render_plan이 slide.gradient={"colors":["A","B"],"dir":"h|v","reverse":bool}를
 import os
 import hashlib
 
-CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_gradcache")
+from src.common import paths
+
+CACHE = os.path.join(paths.CACHE_DIR, "gradient")
 
 
 def _rgb(h):

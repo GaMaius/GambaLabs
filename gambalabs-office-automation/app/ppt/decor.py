@@ -12,7 +12,9 @@ pptxgenjs는 z-order가 곧 호출 순서라, 모델이 그라데이션을 먼�
 import os
 import hashlib
 
-CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_decorcache")
+from src.common import paths
+
+CACHE = os.path.join(paths.CACHE_DIR, "decor")
 
 HEADER_H = 1.05          # freeform_helpers.js 의 HEADER_H 와 같아야 한다
 PX_PER_IN = 120

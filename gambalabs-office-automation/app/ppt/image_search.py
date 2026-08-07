@@ -13,7 +13,9 @@ import os
 import re
 import hashlib
 
-CACHE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "output", "_images")
+from src.common import paths
+
+CACHE = os.path.join(paths.CACHE_DIR, "stock")
 
 
 def _download(url, query):

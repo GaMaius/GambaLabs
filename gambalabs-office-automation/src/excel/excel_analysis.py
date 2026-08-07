@@ -62,8 +62,11 @@ def analyze(xlsx_path: str, question: Optional[str] = None) -> Dict[str, Any]:
 if __name__ == "__main__":
     import sys
     from dotenv import load_dotenv
-    base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
-    p = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(base), "planing", "sample_experiment_log.xlsx")
+    from src.common import paths
+    load_dotenv(paths.env_file())
+    if len(sys.argv) < 2:
+        print("사용법: python -m src.excel.excel_analysis <파일.xlsx>")
+        raise SystemExit(2)
+    p = sys.argv[1]
     print("=== context ===")
     print(build_context(p)[:800])

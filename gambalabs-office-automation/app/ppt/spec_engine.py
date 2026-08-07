@@ -27,9 +27,11 @@ import json
 import subprocess
 import tempfile
 
+from src.common import paths
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.dirname(os.path.dirname(HERE))
-DEFAULT_ASSETS = os.path.join(PROJECT_DIR, "ppt-skill", "assets")
+PROJECT_DIR = paths.RES_DIR
+DEFAULT_ASSETS = paths.ASSETS_DIR
 RENDERER = os.path.join(HERE, "render_deck.js")
 
 _KIND = {"막대": "bar", "바": "bar", "bar": "bar", "원형": "pie", "파이": "pie", "pie": "pie",
@@ -42,7 +44,8 @@ def _resolve_excel(ref: str):
     parts = [p.strip() for p in ref.split("!")]
     path = parts[0]
     if not os.path.isabs(path):
-        path = os.path.normpath(os.path.join(PROJECT_DIR, path))
+        # 스펙에 적힌 상대 경로는 사용자 작업 폴더 기준으로 푼다(리소스 폴더가 아니라).
+        path = os.path.normpath(os.path.join(paths.DATA_DIR, path))
     wb = openpyxl.load_workbook(path, data_only=True)
     if len(parts) == 3:
         ws = wb[parts[1]] if parts[1] in wb.sheetnames else wb.worksheets[0]
@@ -175,8 +178,8 @@ def render_plan(plan: dict, out_pptx: str, assets_dir: str = DEFAULT_ASSETS, ima
         json.dump(plan, tf, ensure_ascii=False)
         plan_path = tf.name
     try:
-        res = subprocess.run(["node", RENDERER, plan_path, assets_dir, out_pptx],
-                             capture_output=True, text=True, cwd=PROJECT_DIR)
+        res = subprocess.run([paths.node_exe(), RENDERER, plan_path, assets_dir, out_pptx],
+                             capture_output=True, text=True, cwd=paths.node_cwd())
         if res.returncode != 0:
             raise RuntimeError(f"render_deck.js 실패: {res.stderr[-600:]}")
     finally:
@@ -210,5 +213,5 @@ if __name__ == "__main__":
 > 기록된 실험 데이터로 자동 생성
 [차트: 선, 데이터=../planing/sample_experiment_log.xlsx!실험기록!정확도(%)]
 """
-    out = os.path.join(PROJECT_DIR, "output", "spec_deck.pptx")
+    out = os.path.join(paths.OUTPUT_DIR, "spec_deck.pptx")
     print("생성:", generate(spec, out))

@@ -390,8 +390,9 @@ def create_sample(path: str):
 
 
 if __name__ == "__main__":
-    base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    sample = os.path.join(os.path.dirname(base), "planing", "sample_rough_input.pptx")
+    # 기본 입력은 없다. 예전에는 프로젝트 **바깥**(../planing)을 가리켜서
+    # 폴더만 옮겨도 바로 깨졌다.
+    sample = ""
     create_sample(sample)
     print("샘플:", sample)
     print(json.dumps(interpret_rules(extract_slides(sample)), ensure_ascii=False, indent=2))

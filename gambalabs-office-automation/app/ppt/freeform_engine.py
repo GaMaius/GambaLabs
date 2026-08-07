@@ -12,8 +12,9 @@ import json
 import tempfile
 import subprocess
 
+from src.common import paths
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.dirname(os.path.dirname(HERE))
 
 # ── 레이아웃 그리드 — freeform_helpers.js 와 **같은 값**이어야 한다 ──
 # 프롬프트·템플릿·검사기가 전부 이 한 벌을 참조한다. 예전에는 각자 다른 y를 써서
@@ -23,8 +24,8 @@ MARGIN = 0.8
 BODY_TOP = 1.93
 BODY_BOTTOM = 6.88
 BODY = {"x": MARGIN, "y": BODY_TOP, "w": 13.333 - MARGIN * 2, "h": BODY_BOTTOM - BODY_TOP}
-DEFAULT_ASSETS = os.path.join(PROJECT_DIR, "ppt-skill", "assets")
-SKILL_DIR = os.path.join(PROJECT_DIR, "ppt-skill")
+DEFAULT_ASSETS = paths.ASSETS_DIR
+SKILL_DIR = paths.SKILL_DIR
 
 # ── 레퍼런스 코드 & 헬퍼 로드 ──
 _SAMPLE_CODE = ""
@@ -588,7 +589,7 @@ var useImages = THEME_INFO.useImages;
 var prs = new pptxgen();
 prs.layout = "{layout}";
 """
-    tmp_dir = os.path.join(PROJECT_DIR, "output", "tmp")
+    tmp_dir = paths.TMP_DIR
     os.makedirs(tmp_dir, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", suffix=".js", dir=tmp_dir, delete=False, encoding="utf-8") as tf:
         tf.write(header + "\n" + js_body)
@@ -596,8 +597,8 @@ prs.layout = "{layout}";
     try:
         if os.path.exists(out_pptx):
             os.remove(out_pptx)
-        res = subprocess.run(["node", js_path, out_pptx], capture_output=True, text=True,
-                             cwd=PROJECT_DIR, timeout=timeout)
+        res = subprocess.run([paths.node_exe(), js_path, out_pptx], capture_output=True, text=True,
+                             cwd=paths.node_cwd(), timeout=timeout)
         if res.returncode != 0:
             raise RuntimeError((res.stderr or res.stdout or "")[-1200:])
         if not os.path.exists(out_pptx):
@@ -818,7 +819,7 @@ rect를 생략하면 본문 박스 전체({BODYL['x']}, {BODYL['y']}, {BODYL['w'
 [출력 형식]
 설명·마크다운 없이 **실행 가능한 JavaScript 본문만** 출력하라.
 require, var prs, prs.layout, THEME_INFO, ASSETS_DIR, A 는 이미 선언되어 있으니 다시 선언하지 마라.
-사진 변수 IMG[n] / GRAD[n] 도 이미 선언되어 있다(예: addSlideImage(s, IMG[3], {{}})).
+사진 변수 IMG[n] / 배경 장식 DECOR[n] 도 이미 선언되어 있다(예: addSlideImage(s, IMG[3], {{}})).
 마지막 줄은 반드시: prs.writeFile({{ fileName: process.argv[2] }});
 """
 
