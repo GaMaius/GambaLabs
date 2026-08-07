@@ -104,16 +104,28 @@ function addHeader(slide, title, themeInfo, assetsDir) {
   }
 }
 
-function addStats(slide, statsList, themeInfo) {
+// 콘텐츠가 놓일 영역. rect가 있으면 그 안에만 그린다(옆에 사진이 있을 때 자리를 비켜주기 위함).
+function contentArea(rect) {
+  const r = rect || {};
+  return {
+    x: r.x != null ? r.x : 0.8,
+    y: r.y != null ? r.y : 1.05,
+    w: r.w != null ? r.w : W - 1.6,
+    h: r.h != null ? r.h : H - 1.05,
+  };
+}
+
+function addStats(slide, statsList, themeInfo, rect) {
   const C = themeInfo.C || {}, F = themeInfo.F || {};
   const n = statsList.length;
   if (n === 0) return;
 
-  const cardH = 3.2;
-  const topY = 2.1; // Vertically centered
-  const leftX = 0.9;
-  const availW = W - 1.8;
+  const A = contentArea(rect);
   const gapX = 0.4;
+  const cardH = Math.min(3.2, A.h - 1.0);
+  const topY = A.y + Math.max(0.4, (A.h - cardH) / 2);
+  const leftX = A.x;
+  const availW = A.w;
   const cardW = (availW - gapX * (n - 1)) / n;
 
   statsList.forEach((st, i) => {
@@ -153,25 +165,42 @@ function addStats(slide, statsList, themeInfo) {
   });
 }
 
-function addCards(slide, cardsList, themeInfo) {
+// 카드 안에 들어갈 글 양으로 적당한 카드 높이를 정한다.
+// 한 줄짜리 내용에 4.2in 카드를 씌우면 흰 여백만 커진다.
+function cardHeightFor(cardsList, cardW, maxH) {
+  let need = 0.9;   // 제목 + 여백
+  cardsList.forEach((c) => {
+    const items = Array.isArray(c.items) ? c.items : null;
+    const body = items ? items.join(" ") : String(c.body || c.label || "");
+    const lines = items ? items.length : Math.max(1, Math.ceil(body.length / Math.max(8, (cardW - 0.6) * 6)));
+    need = Math.max(need, 0.95 + lines * 0.34);
+  });
+  return Math.max(1.5, Math.min(maxH, need));
+}
+
+function addCards(slide, cardsList, themeInfo, rect) {
   const C = themeInfo.C || {}, F = themeInfo.F || {};
   const n = cardsList.length;
   if (n === 0) return;
+
+  const A = contentArea(rect);
 
   // Adapt card height to avoid giant empty white space
   let rows = 1, cols = n;
   if (n === 4) { rows = 2; cols = 2; }
   else if (n >= 5) { rows = 2; cols = Math.ceil(n / 2); }
+  if (A.w < 7 && n > 1) { cols = 1; rows = n; }   // 좁은 영역이면 세로로 쌓는다
 
-  const availW = W - 1.6;
-  const leftX = 0.8;
+  const availW = A.w;
+  const leftX = A.x;
   const gapX = 0.4;
   const gapY = 0.3;
 
-  // Determine ideal card height based on rows
-  const idealH = rows === 1 ? 4.2 : 2.4;
-  const topY = 1.05 + (H - 1.05 - (idealH * rows + gapY * (rows - 1))) / 2; // Center vertically
   const cardW = (availW - gapX * (cols - 1)) / cols;
+  const maxH = (A.h - 0.8 - gapY * (rows - 1)) / rows;
+  const idealH = cardHeightFor(cardsList, cardW, maxH);
+  const totalH = idealH * rows + gapY * (rows - 1);
+  const topY = A.y + Math.max(0.35, (A.h - totalH) / 2);
 
   cardsList.forEach((card, i) => {
     const r = Math.floor(i / cols);
@@ -310,8 +339,10 @@ function addChart(slide, title, chartData, themeInfo, prs, rect) {
 
   const kind = String(chartData.kind || "bar").toLowerCase();
   const labels = chartData.labels.map(String);
-  const palette = [C.brand || "0038A3", C.med || "1970AE", C.sky || "4E86C6",
-                   "9BB4D4", C.teal || "2A9D99", C.hero || "123979"];
+  // 브랜드 계열만 쓰면 파이 조각이 전부 비슷한 파랑이라 구분이 안 된다.
+  // 첫 색은 브랜드로 두고, 나머지는 명도·색상이 확실히 갈리는 값으로 채운다.
+  const palette = [C.brand || "0038A3", "F2A33C", C.teal || "2A9D99",
+                   "8C6BD6", "E2574C", "9BB4D4", C.hero || "123979"];
   // 격자선은 기본 ON — 값을 읽을 수 있어야 차트 구실을 한다.
   const grid = chartData.grid === false ? { style: "none" } : { color: "DDE3EC", size: 0.5 };
   const axis = {

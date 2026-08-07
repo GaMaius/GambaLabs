@@ -391,22 +391,29 @@ def _convert_plan_to_js(plan: dict) -> str:
             continue
 
         head = f"var s = prs.addSlide(); addHeader(s, {title}, THEME_INFO, ASSETS_DIR);"
-        decor = _decor_js(slide)          # 그라데이션·이미지는 콘텐츠보다 먼저
         img = slide.get("image") or {}
-        side = isinstance(img, dict) and img.get("path") and img.get("mode") != "background"
+        side = isinstance(img, dict) and bool(img.get("path")) and img.get("mode") != "background"
+        if side:
+            # 사진 자리를 실제로 비워 둔다. 안 그러면 카드가 사진을 덮어 사진이 안 보인다.
+            img.setdefault("x", 7.3), img.setdefault("y", 1.5)
+            img.setdefault("w", 5.4), img.setdefault("h", 5.2)
+            rect = {"x": 0.8, "y": 1.05, "w": 6.2, "h": 6.45}
+        else:
+            rect = {}
+        decor = _decor_js(slide)          # 그라데이션·이미지는 콘텐츠보다 먼저
+        rect_js = json.dumps(rect)
 
         if stype == "stats":
-            body = f"addStats(s, {json.dumps(slide.get('stats', []), ensure_ascii=False)}, THEME_INFO);"
+            body = f"addStats(s, {json.dumps(slide.get('stats', []), ensure_ascii=False)}, THEME_INFO, {rect_js});"
         elif stype == "compare":
             body = (f"addCompare(s, {json.dumps(slide.get('leftCol', {}), ensure_ascii=False)}, "
                     f"{json.dumps(slide.get('rightCol', {}), ensure_ascii=False)}, THEME_INFO);")
         elif stype == "chart":
-            # 곁에 이미지가 있으면 차트를 왼쪽 절반으로 좁힌다
-            rect = {"x": 0.8, "y": 1.6, "w": 5.9, "h": 4.8} if side else {}
+            crect = {"x": 0.8, "y": 1.6, "w": 6.2, "h": 4.8} if side else {}
             body = (f"addChart(s, {title}, {json.dumps(slide.get('chartData', {}), ensure_ascii=False)}, "
-                    f"THEME_INFO, prs, {json.dumps(rect)});")
+                    f"THEME_INFO, prs, {json.dumps(crect)});")
         else:
-            body = f"addCards(s, {json.dumps(slide.get('cards', []), ensure_ascii=False)}, THEME_INFO);"
+            body = f"addCards(s, {json.dumps(slide.get('cards', []), ensure_ascii=False)}, THEME_INFO, {rect_js});"
 
         lines.append(" ".join(x for x in (head, decor, body) if x))
     lines.append("prs.writeFile({ fileName: process.argv[2] });")
