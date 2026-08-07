@@ -246,33 +246,86 @@ def _plan_presentation(doc_text: str, brief: str = "", media_note: str = "") -> 
 }}
 """
 
-    resp = client.chat.completions.create(
-        model=model_name,
-        temperature=0.3,
-        messages=[
-            {"role": "system", "content": "You are a professional PPT content planner. Output only valid JSON."},
-            {"role": "user", "content": prompt},
-        ]
-    )
+    SYS = "You are a professional PPT content planner. Output only valid JSON."
+    messages = [{"role": "system", "content": SYS}, {"role": "user", "content": prompt}]
 
-    text = resp.choices[0].message.content.strip()
-    m = re.search(r"```(?:json)?\s*\n(.*?)```", text, re.DOTALL)
-    if m:
-        text = m.group(1).strip()
-
-    try:
-        plan = json.loads(text)
-        if isinstance(plan, dict) and "slides" in plan and len(plan["slides"]) > 0:
+    # JSON이 깨지면 그 오류를 알려주고 두 번까지 다시 받는다.
+    # (예전에는 한 번 실패하면 문서를 통째로 버리고 2장짜리 껍데기를 만들었다)
+    for attempt in range(3):
+        try:
+            resp = client.chat.completions.create(model=model_name, temperature=0.3, messages=messages)
+        except Exception as e:
+            print(f"[freeform_engine] 기획 호출 실패: {e}")
+            break
+        text = (resp.choices[0].message.content or "").strip()
+        m = re.search(r"```(?:json)?\s*\n(.*?)```", text, re.DOTALL)
+        if m:
+            text = m.group(1).strip()
+        plan = _parse_plan_json(text)
+        if plan:
             return plan
-    except Exception as e:
-        print(f"[freeform_engine] 기획안 JSON 파싱 경고, 기본 구조 생성: {e}")
+        print(f"[freeform_engine] 기획안 JSON 파싱 실패({attempt + 1}/3) → 재요청")
+        messages = [{"role": "system", "content": SYS},
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": text[:3000]},
+                    {"role": "user", "content":
+                     "위 출력이 올바른 JSON이 아니다. 설명·주석 없이 파싱 가능한 JSON만 다시 출력하라. "
+                     "문자열 안의 따옴표는 이스케이프하고, 마지막 요소 뒤에 쉼표를 붙이지 마라."}]
 
-    return {
-        "slides": [
-            {"layout_type": "cover", "title": "발표 자료", "subtitle": brief or "문서 요약", "presenter": "감바랩스"},
-            {"layout_type": "cards", "title": "주요 내용", "cards": [{"title": "요약", "body": doc_text[:300]}]}
-        ]
-    }
+    print("[freeform_engine] 기획 실패 → 입력 슬라이드를 그대로 옮겨 구성")
+    return _fallback_plan(doc_text, brief)
+
+
+def _parse_plan_json(text: str):
+    """JSON 파싱. 흔한 깨짐(뒤쪽 쉼표, 앞뒤 잡문)은 고쳐서 한 번 더 시도."""
+    def ok(p):
+        return isinstance(p, dict) and isinstance(p.get("slides"), list) and len(p["slides"]) > 0
+    try:
+        p = json.loads(text)
+        if ok(p):
+            return p
+    except Exception:
+        pass
+    # 바깥 중괄호만 잘라내고 뒤쪽 쉼표 제거
+    i, j = text.find("{"), text.rfind("}")
+    if i >= 0 and j > i:
+        cand = re.sub(r",(\s*[}\]])", r"\1", text[i:j + 1])
+        try:
+            p = json.loads(cand)
+            if ok(p):
+                return p
+        except Exception:
+            pass
+    return None
+
+
+def _fallback_plan(doc_text: str, brief: str = "") -> dict:
+    """기획 실패 시 입력 슬라이드를 1:1로 옮긴다. 내용을 버리지 않는 게 핵심."""
+    blocks = re.split(r"\[슬라이드\s*\d+\]\s*", doc_text or "")
+    blocks = [b.strip() for b in blocks if b.strip()]
+    if not blocks:
+        return {"slides": [{"layout_type": "cover", "title": "발표 자료",
+                            "subtitle": brief or "문서 요약", "presenter": ""}]}
+
+    head = [ln.strip() for ln in blocks[0].splitlines() if ln.strip()]
+    title = head[0] if head else "발표 자료"
+    subtitle = ""
+    for ln in head[1:]:
+        subtitle = re.sub(r"^부제\s*[:：]\s*", "", ln)
+        break
+
+    slides = [{"layout_type": "cover", "title": title, "subtitle": subtitle, "presenter": ""}]
+    for b in blocks[1:]:
+        lines = [ln.strip() for ln in b.splitlines() if ln.strip()]
+        if not lines:
+            continue
+        # 위치 힌트 주석은 본문에서 뺀다
+        body = [re.sub(r"\s*\(지시 영역:[^)]*\)", "", ln) for ln in lines[1:]]
+        body = [ln for ln in body if ln]
+        cards = [{"title": ln[:28], "body": ln} for ln in body[:4]] or \
+                [{"title": lines[0][:28], "body": lines[0]}]
+        slides.append({"layout_type": "cards", "title": lines[0], "cards": cards})
+    return {"slides": slides}
 
 
 def _resolve_media(plan: dict, theme_info: dict, user_images: dict = None) -> dict:
@@ -319,6 +372,10 @@ def _resolve_media(plan: dict, theme_info: dict, user_images: dict = None) -> di
             src = img.get("src")
             if src and os.path.exists(src):
                 img["path"] = src
+                # 사용자가 직접 넣은 사진은 '보여주려고' 넣은 것이다.
+                # 반투명 배경으로 깔면 흐릿해져 넣은 의미가 없다 → 영역 배치로 고정.
+                img["mode"] = "region"
+                img.pop("transparency", None)
             elif img.get("query"):
                 try:
                     # 배경으로 깔 이미지는 차분한 것을 골라야 그 위 글자가 읽힌다.

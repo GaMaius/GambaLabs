@@ -37,6 +37,78 @@ except Exception:
     pass
 
 
+def groq_keys() -> List[str]:
+    """쓸 수 있는 Groq 키 전부. GROQ_API_KEY, GROQ_API_KEY_2, _3 … 순서."""
+    keys = []
+    for name in ("GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"):
+        v = (os.getenv(name) or "").strip()
+        if v and v not in keys:
+            keys.append(v)
+    return keys
+
+
+# 한 키가 한도에 걸리면 다음 키로 넘어가고, 성공한 키를 다음 호출의 시작점으로 삼는다.
+_key_cursor = 0
+
+
+def _is_switchable(err: Exception) -> bool:
+    """키를 바꿔서 해결될 만한 오류인가(한도 초과·인증·일시 장애)."""
+    s = str(err).lower()
+    return any(t in s for t in (
+        "rate_limit", "rate limit", "429", "413", "quota", "insufficient",
+        "invalid api key", "invalid_api_key", "401", "403",
+        "500", "502", "503", "over capacity", "overloaded"))
+
+
+class _Completions:
+    def __init__(self, owner):
+        self._o = owner
+
+    def create(self, **kw):
+        return self._o._create(**kw)
+
+
+class _Chat:
+    def __init__(self, owner):
+        self.completions = _Completions(owner)
+
+
+class FailoverClient:
+    """키를 여러 개 두고 실패하면 다음 키로 넘기는 OpenAI 호환 클라이언트.
+
+    호출부는 그대로 `client.chat.completions.create(...)`를 쓰면 된다.
+    """
+
+    def __init__(self, keys: List[str], base_url: Optional[str], **client_kwargs):
+        self._keys = keys or [""]
+        self._base = base_url
+        self._kw = client_kwargs
+        self._cache: Dict[str, OpenAI] = {}
+        self.chat = _Chat(self)
+
+    def _client(self, key: str) -> OpenAI:
+        if key not in self._cache:
+            self._cache[key] = OpenAI(api_key=key or "not_set", base_url=self._base, **self._kw)
+        return self._cache[key]
+
+    def _create(self, **kw):
+        global _key_cursor
+        n = len(self._keys)
+        last = None
+        for off in range(n):
+            i = (_key_cursor + off) % n
+            try:
+                r = self._client(self._keys[i]).chat.completions.create(**kw)
+                _key_cursor = i          # 성공한 키를 다음에도 먼저 쓴다
+                return r
+            except Exception as e:
+                last = e
+                if not _is_switchable(e) or off == n - 1:
+                    raise
+                print(f"[llm_client] API 키 {i + 1}번 실패({str(e)[:90]}…) → {((i + 1) % n) + 1}번 키로 전환")
+        raise last
+
+
 def fetch_groq_models(timeout: float = 4.0, force: bool = False) -> Optional[List[str]]:
     """Groq에서 지금 실제로 쓸 수 있는 채팅 모델 목록. 실패하면 None."""
     global _groq_cache
@@ -45,17 +117,22 @@ def fetch_groq_models(timeout: float = 4.0, force: bool = False) -> Optional[Lis
     if models is not None and not force and (time.time() - ts) < _GROQ_CACHE_TTL:
         return models
 
-    key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if not key:
+    keys = groq_keys() or [os.getenv("OPENAI_API_KEY") or ""]
+    keys = [k for k in keys if k]
+    if not keys:
         return None
     base = (os.getenv("GROQ_BASE_URL") or "https://api.groq.com/openai/v1").rstrip("/")
-    try:
-        import requests
-        r = requests.get(base + "/models", headers={"Authorization": f"Bearer {key}"}, timeout=timeout)
-        if r.status_code != 200:
-            return None
-        ids = [m.get("id", "") for m in r.json().get("data", [])]
-    except Exception:
+    ids = None
+    for k in keys:                      # 한 키가 죽어도 다른 키로 목록을 받는다
+        try:
+            import requests
+            r = requests.get(base + "/models", headers={"Authorization": f"Bearer {k}"}, timeout=timeout)
+            if r.status_code == 200:
+                ids = [m.get("id", "") for m in r.json().get("data", [])]
+                break
+        except Exception:
+            continue
+    if ids is None:
         return None
 
     chat = sorted(i for i in ids if i and not any(x in i.lower() for x in _GROQ_NON_CHAT))
@@ -89,9 +166,13 @@ def get_llm_client_and_model(
     provider = get_llm_provider()
 
     if provider == "groq":
-        api_key = override_api_key or os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY") or "groq_key"
         base_url = override_base_url or os.getenv("GROQ_BASE_URL") or "https://api.groq.com/openai/v1"
-        model = override_model or os.getenv("GROQ_MODEL") or "llama-3.3-70b-versatile"
+        model = override_model or os.getenv("GROQ_MODEL") or GROQ_DEFAULT_MODEL
+        keys = [override_api_key] if override_api_key else groq_keys()
+        if not keys:
+            keys = [os.getenv("OPENAI_API_KEY") or "groq_key"]
+        # 키가 여러 개면 한도(TPM)에 걸릴 때 자동으로 다음 키로 넘어간다.
+        return FailoverClient(keys, base_url), model
     elif provider == "ollama":
         api_key = override_api_key or os.getenv("OPENAI_API_KEY") or "ollama"
         base_url = override_base_url or os.getenv("OPENAI_BASE_URL") or "http://localhost:11434/v1"
