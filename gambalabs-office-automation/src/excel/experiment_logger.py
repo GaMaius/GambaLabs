@@ -97,27 +97,63 @@ class ExperimentLogger:
 
     def _rebuild_chart(self, ws, n_data: int, value_col: int = 3, cat_col: int = 1,
                        anchor: str = "H2", value_cols: List[int] = None, header_row: int = 1):
-        """추이 라인차트 재생성. value_cols가 주어지면 다중 지표(시리즈)로 그린다.
-        header_row: 헤더가 몇 행에 있는지(1행이 아닐 수 있음) — 데이터 범위 계산에 사용."""
+        """추이 라인차트 재생성. 축 위치(X=하단, Y=좌측) 및 축 제목/범례를 정밀하게 설정하여 올바른 엑셀 차트를 형성한다."""
+        from openpyxl.chart.axis import ChartLines
+        from openpyxl.chart.legend import Legend
+
         ws._charts = []  # 기존 차트 제거 후 재생성(범위 자동 확장)
         chart = LineChart()
         cols = [c for c in (value_cols or [value_col]) if c]
-        chart.title = "지표 추이" if len(cols) > 1 else "추이"
-        chart.height, chart.width = 8, 18
-        chart.y_axis.majorGridlines = None
+
+        # 1. 축 위치 정밀 고정 (Openpyxl 기본값 오류 방지: X축=하단, Y축=좌측)
+        chart.x_axis.axPos = "b"
+        chart.y_axis.axPos = "l"
+
+        # 2. 축 제목 및 단위 설정
+        cat_name = str(ws.cell(header_row, cat_col).value or "회차")
+        chart.x_axis.title = cat_name
+
+        if len(cols) == 1:
+            metric_name = str(ws.cell(header_row, cols[0]).value or "지표")
+            chart.title = f"실험 {metric_name} 추이"
+            chart.y_axis.title = metric_name
+            # 단일 시리즈일 때는 범례 제거 (범례에 카테고리 수치가 잘못 들어가는 엑셀 오인식 방지)
+            chart.legend = None
+        else:
+            chart.title = "실험 주요 지표 추이 비교"
+            chart.y_axis.title = "측정값"
+            # 다중 시리즈일 때만 하단 범례 표시
+            chart.legend = Legend()
+            chart.legend.position = "b"
+
+        chart.height, chart.width = 10, 19
+
+        # 3. 주 격자선(Gridlines) 및 축 눈금(Tick Mark) 설정
+        chart.y_axis.majorGridlines = ChartLines()
+        chart.x_axis.majorTickMark = "out"
+        chart.y_axis.majorTickMark = "out"
+
+        # 4. 카테고리(X축) 및 데이터(Y축) 범위 연결
         cats = Reference(ws, min_col=cat_col, min_row=header_row + 1, max_row=header_row + n_data)
         for c in cols:
             data = Reference(ws, min_col=c, min_row=header_row, max_row=header_row + n_data)
             chart.add_data(data, titles_from_data=True)
         chart.set_categories(cats)
+
+        # 5. 라인 스타일 및 데이터 포인트 눈금/표식(Marker) 설정
+        symbols = ["circle", "square", "diamond", "triangle"]
         for i, ser in enumerate(chart.series):
-            ser.graphicalProperties.line.solidFill = self._PALETTE[i % len(self._PALETTE)]
-            ser.graphicalProperties.line.width = 28000
+            color = self._PALETTE[i % len(self._PALETTE)]
+            ser.graphicalProperties.line.solidFill = color
+            ser.graphicalProperties.line.width = 25000
             ser.smooth = False
-        if len(cols) > 1:
-            chart.legend.position = "b"
-        else:
-            chart.legend = None
+
+            # 눈금 마커(Marker) 표식 설정
+            ser.marker.symbol = symbols[i % len(symbols)]
+            ser.marker.size = 6
+            ser.marker.graphicalProperties.solidFill = color
+            ser.marker.graphicalProperties.line.solidFill = color
+
         ws.add_chart(chart, anchor)
 
     def _numeric_value_cols(self, ws, headers) -> List[int]:
@@ -274,11 +310,12 @@ def create_sample(path: str):
 
 if __name__ == "__main__":
     import sys
-    base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    sample = os.path.join(base, "planing", "sample_experiment_log.xlsx")
+    from src.common import paths
+    # 데모용 샘플은 작업 폴더 안에 만든다(예전엔 프로젝트 바깥 ../planing 을 봤다).
+    sample = os.path.join(paths.OUTPUT_DIR, "excel", "sample_experiment_log.xlsx")
     if not os.path.exists(sample) or "--recreate" in sys.argv:
         print("샘플 생성:", create_sample(sample))
-    out = os.path.join(base, "output", "experiment_logged.xlsx")
+    out = os.path.join(paths.OUTPUT_DIR, "excel", "experiment_logged.xlsx")
     res = ExperimentLogger().append_result(sample, "4회차 정확도 92.3%, SNR -20dB, 오인식 1건, 노이즈 강인성 개선", out)
     import json
     print(json.dumps(res, ensure_ascii=False, indent=2))

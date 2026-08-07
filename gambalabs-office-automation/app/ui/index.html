@@ -445,9 +445,19 @@
       </div>
 
       <details class="api-more">
-        <summary>이미지 검색 키 (선택)</summary>
-        <label class="fld">Pexels API 키<input id="apiPexels" type="password" placeholder="비우면 Openverse 사용(키 불필요)"
-            autocomplete="off"></label>
+        <summary>이미지 검색 키 (선택) — 슬라이드 배경·삽화용 스톡 사진</summary>
+        <div class="hint" style="margin:6px 0 8px">둘 다 비워 둬도 됩니다. 그때는 키가 필요 없는
+          <b>Openverse</b>(CC 라이선스)에서 가져옵니다. 키를 넣으면 화질과 검색 품질이 올라갑니다.
+          <br>우선순위: <b>Unsplash → Pexels → Openverse</b></div>
+        <label class="fld">Unsplash Access Key
+          <input id="apiUnsplash" type="password" placeholder="unsplash.com/developers" autocomplete="off">
+        </label>
+        <label class="fld">Pexels API 키
+          <input id="apiPexels" type="password" placeholder="pexels.com/api" autocomplete="off">
+        </label>
+        <div class="row" style="margin-top:8px">
+          <button class="btn btn-util" style="flex:1" onclick="apiTestImage()">이미지 검색 확인</button>
+        </div>
       </details>
 
       <div class="row" style="margin-top:14px">

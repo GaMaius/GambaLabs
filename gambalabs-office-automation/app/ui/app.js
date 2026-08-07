@@ -378,11 +378,12 @@ async function openFloat() {
    키는 .env 파일에만 저장한다. 이미 저장된 키는 마스킹해서 placeholder로만 보여주고,
    입력란은 항상 비워 둔다 → 빈 칸으로 저장하면 기존 값이 유지된다(실수로 날리는 것 방지). */
 const API_GROUPS = { groq: "apiGroq", openai: "apiOpenai", ollama: "apiOllama" };
+const API_KEY_FIELDS = ["apiGroqKey", "apiGroqKey2", "apiOpenaiKey", "apiPexels", "apiUnsplash"];
 
 async function openApiModal() {
   $("apiModal").classList.remove("hidden");
   $("apiResult").classList.add("hidden");
-  ["apiGroqKey", "apiGroqKey2", "apiOpenaiKey", "apiPexels"].forEach((id) => ($(id).value = ""));
+  API_KEY_FIELDS.forEach((id) => ($(id).value = ""));
   try {
     const s = await api().settings_get();
     $("apiEnvPath").textContent = s._path || ".env";
@@ -392,7 +393,8 @@ async function openApiModal() {
       $(id).placeholder = v && v.set ? `${v.display}  (저장됨 · 그대로 두면 유지)` : $(id).placeholder;
     };
     ph("apiGroqKey", "GROQ_API_KEY"); ph("apiGroqKey2", "GROQ_API_KEY2");
-    ph("apiOpenaiKey", "OPENAI_API_KEY"); ph("apiPexels", "PEXELS_API_KEY");
+    ph("apiOpenaiKey", "OPENAI_API_KEY");
+    ph("apiPexels", "PEXELS_API_KEY"); ph("apiUnsplash", "UNSPLASH_ACCESS_KEY");
     $("apiOpenaiModel").value = (s.OPENAI_MODEL && s.OPENAI_MODEL.display) || "";
     $("apiOllamaModel").value = (s.OPENAI_MODEL && s.OPENAI_MODEL.display) || "";
     $("apiBaseUrl").value = (s.OPENAI_BASE_URL && s.OPENAI_BASE_URL.display) || "";
@@ -408,7 +410,11 @@ function apiSwitchGroup() {
 
 async function apiSave() {
   const p = $("apiProvider").value;
-  const vals = { LLM_PROVIDER: p, PEXELS_API_KEY: $("apiPexels").value };
+  const vals = {
+    LLM_PROVIDER: p,
+    PEXELS_API_KEY: $("apiPexels").value,
+    UNSPLASH_ACCESS_KEY: $("apiUnsplash").value,
+  };
   if (p === "groq") {
     vals.GROQ_API_KEY = $("apiGroqKey").value;
     vals.GROQ_API_KEY2 = $("apiGroqKey2").value;
@@ -426,7 +432,7 @@ async function apiSave() {
     const r = await api().settings_save(vals);
     if (r.error) { show(box, `<span class="err">${esc(r.error)}</span>`); return; }
     show(box, `<span class="ok">✅ 저장했어요.</span> 바로 적용됩니다 · <span class="mono">${esc(r.path)}</span>`);
-    ["apiGroqKey", "apiGroqKey2", "apiOpenaiKey", "apiPexels"].forEach((id) => ($(id).value = ""));
+    API_KEY_FIELDS.forEach((id) => ($(id).value = ""));
     initStatus();
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
 }
@@ -439,6 +445,17 @@ async function apiTest() {
     show(box, r.ok
       ? `<span class="ok">✅ 연결됨</span> — 모델 <span class="mono">${esc(r.model)}</span>`
       : `<span class="err">연결 실패: ${esc(r.error)}</span>`);
+  } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
+}
+
+async function apiTestImage() {
+  const box = $("apiResult");
+  spin(box, "이미지 검색 확인 중…");
+  try {
+    const r = await api().settings_test_image();
+    show(box, r.ok
+      ? `<span class="ok">✅ ${esc(r.source)}</span> 에서 사진을 받았습니다.`
+      : `<span class="err">이미지 검색 실패: ${esc(r.error)}</span>`);
   } catch (e) { show(box, `<span class="err">${esc(e.message || e)}</span>`); }
 }
 
@@ -608,12 +625,12 @@ async function analyzeExpData() {
 /* ── 데이터: 자동 영수증 작성 ── */
 let RECEIPT_TPL = ""; // 사용자 선택 양식 (기본값 설정됨)
 async function initReceiptTpl() {
-  let dir = "";
-  try { dir = await api().project_dir(); } catch (e) {}
-  if(dir) {
-    RECEIPT_TPL = dir + "\\planing\\엑셀 간이영수증 표준 양식 v2.0.xlsx";
-    setPath("receiptTplPath", RECEIPT_TPL);
-  }
+  // 경로를 프런트에서 조립하지 않는다 — 동봉 양식의 위치는 백엔드만 안다.
+  // 예전엔 프로젝트 **바깥**(../planing/…)을 문자열로 붙여서, 폴더째 전달하면 바로 깨졌다.
+  try {
+    const p = await api().receipt_template();
+    if (p) { RECEIPT_TPL = p; setPath("receiptTplPath", p); }
+  } catch (e) {}
 }
 async function pickReceiptTpl() {
   const p = await api().pick_file("xlsx");

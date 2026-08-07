@@ -104,6 +104,16 @@ class Api:
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
 
+    def settings_test_image(self):
+        """스톡 이미지 검색을 실제로 한 번 해 본다. 키가 없어도 Openverse로 되면 성공이다."""
+        try:
+            p = image_search.fetch_image("blue abstract texture", mode="region")
+            if p and os.path.exists(p):
+                return {"ok": True, "source": image_search.source_label(), "path": p}
+            return {"ok": False, "error": "사진을 받지 못했습니다. 인터넷 연결을 확인하세요."}
+        except Exception as e:
+            return {"ok": False, "error": str(e)[:300]}
+
     def settings_test(self):
         """현재 키로 실제 한 번 호출해 본다. 인수인계 받은 사람이 바로 확인할 수 있게."""
         try:
@@ -649,6 +659,15 @@ class Api:
             return {"error": str(e)}
 
     # ── 데이터: 자동 영수증 작성 ───────────────────────
+    def receipt_template(self):
+        """동봉된 영수증 표준 양식 경로. 예전엔 프런트가 프로젝트 **바깥**
+        (../planing/…)을 문자열로 조립해서, 폴더째 전달하면 바로 깨졌다."""
+        for name in ("엑셀 간이영수증 표준 양식 v2.0.xlsx", "receipt_template.xlsx"):
+            p = os.path.join(paths.RES_DIR, "assets", name)
+            if os.path.exists(p):
+                return p
+        return ""
+
     def excel_make_receipt(self, text, template_path):
         if not text:
             return {"error": "영수증 내용을 입력하세요."}

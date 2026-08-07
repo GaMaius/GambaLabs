@@ -50,6 +50,7 @@ DATAS = [
     ("src/vector/_svg_raster.js", "src/vector"),
     ("ppt-skill/examples/build_samples.js", "ppt-skill/examples"),
     (".env.example", "."),          # 첫 저장 때 주석 있는 뼈대로 쓴다
+    ("assets", "assets"),           # 영수증 표준 양식 · 보고서 도식
 ]
 
 # 정적 분석으로 안 잡히는 것들(지연 import·플러그인)
