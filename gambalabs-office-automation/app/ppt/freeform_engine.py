@@ -493,6 +493,11 @@ var ASSETS_DIR = {json.dumps(assets_dir.replace(chr(92), '/'))};
 var A = function(p) {{ return path.resolve(ASSETS_DIR, p); }};
 var IMG = {json.dumps(img_map, ensure_ascii=False)};
 var GRAD = {json.dumps(grad_map, ensure_ascii=False)};
+// 프롬프트에서 C/F를 쓰라고 안내하므로 여기서 반드시 정의해 둔다.
+// (없으면 모델이 쓴 코드가 전부 "C is not defined"로 죽는다 — 실제로 그랬다)
+var C = THEME_INFO.C || {{}};
+var F = THEME_INFO.F || {{}};
+var useImages = THEME_INFO.useImages;
 {_HELPERS_CODE}
 var prs = new pptxgen();
 prs.layout = "LAYOUT_WIDE";
@@ -523,7 +528,8 @@ def _generate_by_code(plan: dict, out_pptx: str, assets_dir: str,
     """모델이 pptxgenjs 코드를 직접 쓰고, 실행·기하 검사 결과로 고쳐 쓴다."""
     from src.common.llm_client import get_llm_client_and_model
     from app.ppt import deck_lint
-    client, model_name = get_llm_client_and_model()
+    client, model_name = get_llm_client_and_model(override_model=_code_model())
+    print(f"[freeform_engine] 자유 설계 코드 생성 모델: {model_name}")
     media = _media_maps(plan)
     slides = plan.get("slides", [])
     expect = {
@@ -578,6 +584,28 @@ def _generate_by_code(plan: dict, out_pptx: str, assets_dir: str,
                       "생성된 덱을 검사하니 아래 문제가 있다. 해당 슬라이드의 좌표·크기를 고쳐 "
                       "전체 코드를 다시 출력하라. 설명 없이 코드만.\n- " + "\n- ".join(problems)}]
     return False
+
+
+# 코드를 잘 쓰는 순으로. 기획(한국어 이해)과 코드 작성은 요구 능력이 달라서 모델을 나눈다.
+_CODE_MODEL_PREF = ("openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b")
+
+
+def _code_model():
+    """자유 설계 코드 생성에 쓸 모델. 없으면 None(현재 모델 그대로)."""
+    forced = (os.getenv("PPT_CODE_MODEL") or "").strip()
+    if forced:
+        return forced
+    try:
+        from src.common.llm_client import get_llm_provider, fetch_groq_models
+        if get_llm_provider() != "groq":
+            return None
+        live = fetch_groq_models() or []
+        for m in _CODE_MODEL_PREF:
+            if m in live:
+                return m
+    except Exception:
+        pass
+    return None
 
 
 def _code_prompt(plan: dict, assets_dir: str, theme_info: dict, brief: str = "") -> str:
@@ -668,7 +696,7 @@ def _extract_js_body(response: str) -> str:
         raise ValueError("addSlide 호출이 없다")
     # 헤더에서 이미 선언한 것들을 모델이 또 선언하면 SyntaxError가 난다.
     drop = re.compile(
-        r"^\s*(?:var|let|const)\s+(?:path|pptxgen|prs|THEME_INFO|ASSETS_DIR|A)\s*=|"
+        r"^\s*(?:var|let|const)\s+(?:path|pptxgen|prs|THEME_INFO|ASSETS_DIR|A|C|F|IMG|GRAD|useImages)\s*=|"
         r"^\s*(?:const|var|let)\s*\{[^}]*\}\s*=\s*require\(|"
         r"^\s*require\(|^\s*prs\.layout\s*=|^\s*module\.exports")
     lines = [ln for ln in text.splitlines() if not drop.match(ln)]

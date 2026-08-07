@@ -30,8 +30,9 @@ function addCover(prs, title, subtitle, presenter, themeInfo, assetsDir) {
   if (useImages) {
     slide.background = { path: A("backgrounds/bg_cover.png") };
     try { slide.addImage({ path: A("logo/logo_white.png"), x: 10.05, y: 0.5, w: 2.55, h: 0.31 }); } catch(e){}
+    // 장식 아치. y+h가 7.5을 넘으면 슬라이드 밖으로 나간다(예전 값 y3.05+h5.0=8.05).
     slide.addShape('roundRect', {
-      x: 9.55, y: 3.05, w: 1.95, h: 5.0, rectRadius: 0.97,
+      x: 9.55, y: 1.5, w: 1.95, h: 4.6, rectRadius: 0.97,
       fill: { color: "EAEAEA", transparency: 88 }, line: { type: "none" }
     });
     slide.addText(title, {

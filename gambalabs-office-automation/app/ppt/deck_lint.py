@@ -98,9 +98,15 @@ def lint(pptx_path: str, expect: dict = None) -> List[str]:
                     f"슬라이드 {i}: '{label}'이(가) 슬라이드 밖으로 나감 "
                     f"(x={r['x']:.2f} y={r['y']:.2f} w={r['w']:.2f} h={r['h']:.2f}, 화면은 {W_IN}x{H_IN})")
 
-        # 2) 사진이 다른 요소에 가려짐 (배경으로 깔린 전면 이미지는 제외)
-        pics = [r for r in rs if r["kind"] == "pic" and r["w"] * r["h"] > 0.5
-                and not (r["w"] > W_IN * 0.9 and r["h"] > (H_IN - 1.05) * 0.9)]
+        # 2) 사진이 다른 요소에 가려짐
+        #    장식은 제외한다: 헤더 밴드·로고(상단 1.1in 안), 전면 배경 이미지, 그라데이션 패널.
+        #    이걸 안 빼면 밴드 위의 제목 텍스트를 '사진을 가림'으로 오탐해 루프가 헛돈다.
+        pics = [r for r in rs
+                if r["kind"] == "pic"
+                and r["w"] * r["h"] > 0.5
+                and r["y"] + r["h"] > 1.15                                  # 헤더 장식 제외
+                and not (r["w"] > W_IN * 0.9 and r["h"] > (H_IN - 1.05) * 0.9)  # 전면 배경 제외
+                and not (r["h"] > (H_IN - 1.05) * 0.9)]                     # 세로 전면 패널 제외
         for p_i, p in enumerate(pics):
             area = p["w"] * p["h"]
             covered = 0.0
@@ -134,14 +140,27 @@ def lint(pptx_path: str, expect: dict = None) -> List[str]:
         if used < (W_IN * (H_IN - 1.05)) * 0.15:
             problems.append(f"슬라이드 {i}: 본문이 거의 비어 있다. 내용을 채우거나 배치를 키워라.")
 
-        # 5) 상단 헤더 영역이 비었다(표지 제외) — 제목 없는 맨 슬라이드 방지
+        # 5) 상단에 제목 '글자'가 없다(표지 제외).
+        #    밴드 이미지만 깔고 제목을 안 쓰는 경우가 있어 도형이 아니라 텍스트로 확인한다.
         if i > 1 or not expect.get("cover", True):
-            if not any(r["y"] < 1.1 and r["w"] > 3 for r in rs):
+            if not any(r["kind"] == "text" and r["y"] < 1.2 for r in rs):
                 problems.append(
-                    f"슬라이드 {i}: 상단 헤더(제목 밴드)가 없다. "
-                    f"addHeader(s, 제목, THEME_INFO, ASSETS_DIR)를 먼저 호출하라.")
+                    f"슬라이드 {i}: 상단에 제목 텍스트가 없다. "
+                    f"addHeader(s, \"제목\", THEME_INFO, ASSETS_DIR)로 제목을 넣어라.")
 
-        # 6) 표지가 비었다
+        # 6) 본문이 한쪽으로 쏠려 절반이 빈다(사진·그라데이션이 없는데도)
+        has_side = any(r["kind"] == "pic" and r["y"] > 1.15 for r in rs)
+        body_items = [r for r in rs if r["y"] > 1.15]
+        if body_items and not has_side:
+            right = max(r["x"] + r["w"] for r in body_items)
+            left = min(r["x"] for r in body_items)
+            if right < W_IN * 0.62 or left > W_IN * 0.38:
+                problems.append(
+                    f"슬라이드 {i}: 본문이 한쪽에만 몰려 화면 절반이 비었다"
+                    f"(가로 {left:.1f}~{right:.1f}in만 사용). 가용 폭 0.8~12.53을 고루 쓰거나 "
+                    f"가운데 정렬로 배치하라.")
+
+        # 7) 표지가 비었다
         if i == 1 and expect.get("cover", True):
             if len([r for r in rs if r["kind"] == "text"]) == 0:
                 problems.append("슬라이드 1(표지)에 제목이 없다. addCover(prs, 제목, 부제, 발표자, THEME_INFO, ASSETS_DIR)를 쓰라.")

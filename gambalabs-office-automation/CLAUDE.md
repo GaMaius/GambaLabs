@@ -69,9 +69,14 @@ LibreOffice 설치 완료(`C:\Program Files\LibreOffice\program\soffice.exe`) + 
   기획 대비 누락(차트 슬라이드에 실제 차트 없음, 배치돼야 할 사진 없음)을 문자열 목록으로.
 - freeform 자유 설계는 이 둘로 자가 검증한다: 코드 생성 → 실행(실패 시 에러 주고 재작성) →
   lint(결함 있으면 지적하고 재작성) → 3회차에도 남으면 **템플릿으로 폴백**.
-- ⚠️ 실측: llama-3.3-70b는 pptxgenjs 자유 생성 품질이 템플릿보다 나쁘다(표지 공백·글자 겹침·
-  차트를 회색 네모+숫자로 흉내). 자유 설계를 실효화하려면 코딩 강한 모델(GPT-4o급)이 필요.
-  `PPT_FREE_LAYOUT=0`으로 자유 설계를 끌 수 있다.
+- **모델 분리**: 기획(한국어 이해)과 코드 작성은 요구 능력이 다르다. 코드 생성만
+  `_code_model()`이 고른 강한 모델로 돌린다(Groq면 `openai/gpt-oss-120b` 우선).
+  `PPT_CODE_MODEL`로 강제 지정, `PPT_FREE_LAYOUT=0`으로 자유 설계 자체를 끌 수 있다.
+- ⚠️ 실측 이력: 처음엔 "70B가 코드를 못 쓴다"고 판단했는데 **오진이었다.** 주입 헤더에
+  `C`/`F`를 정의하지 않아 모델이 쓴 코드가 전부 `C is not defined`로 죽고 있었다.
+  고친 뒤 gpt-oss-120b는 1~2회차에 통과한다. **자유 설계가 실패하면 모델을 탓하기 전에
+  주입 헤더와 lint 오탐부터 확인할 것.**
+- lint 오탐 주의: 헤더 밴드·로고 이미지를 '가려진 사진'으로 세면 루프가 헛돈다(제외 처리됨).
 
 ## 4. LLM 백엔드 — `src/common/llm_client.py` 및 `.env` (gitignore됨)
 - **Groq (GPT OSS - Llama 3.3 70B, Qwen 2.5 32B, DeepSeek R1)** / **Ollama** / **OpenAI** 3원 통합 팩토리.
