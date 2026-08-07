@@ -137,7 +137,20 @@ function updateThemeDel() {
   $("themeDelBtn").classList.toggle("hidden", !(cur && cur.custom));
 }
 async function onModelChange() {
-  try { await api().set_model($("modelSel").value); } catch (e) {}
+  try {
+    const r = await api().set_model($("modelSel").value);
+    // 폐기된 모델을 골랐으면 백엔드가 거부하고 목록을 갱신해 준다 → 드롭다운을 다시 그린다
+    if (r && r.options) {
+      const sel = $("modelSel"); sel.innerHTML = "";
+      r.options.forEach((m) => {
+        const o = document.createElement("option");
+        o.value = m; o.textContent = MODEL_LABEL(m);
+        if (m === r.current) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+    if (r && r.error) alert(r.error);
+  } catch (e) {}
   resetChat();  // 모델 바뀌면 백엔드 대화가 초기화됨 → 프런트도 리셋
 }
 async function onThemeChange() { try { await api().set_theme($("themeSel").value); } catch (e) {} updateThemeDel(); }

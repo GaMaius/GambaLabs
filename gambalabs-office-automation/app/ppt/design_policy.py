@@ -24,9 +24,11 @@
 """
 import os
 
-# 강한(클라우드) 모델로 볼 이름 힌트
+# 강한(클라우드/고성능 70B+) 모델로 볼 이름 힌트
 _STRONG_HINTS = ("gpt-4", "gpt-4o", "gpt-4.1", "gpt-5", "o1", "o3", "o4",
-                 "claude", "sonnet", "opus", "gemini")
+                 "claude", "sonnet", "opus", "gemini",
+                 "llama-3.3", "70b", "120b", "32b", "27b",
+                 "gpt-oss", "compound", "deepseek", "mixtral", "qwen-2.5", "qwen3")
 
 
 def is_local_endpoint() -> bool:
@@ -35,8 +37,16 @@ def is_local_endpoint() -> bool:
 
 
 def is_strong_model() -> bool:
-    """비(非)로컬 엔드포인트 + 강한 모델명이면 강한 모델로 간주."""
-    model = (os.getenv("OPENAI_MODEL") or "").lower()
+    """Groq LPU, OpenAI, Claude 등 고성능 클라우드/70B+ 모델이면 강한 모델(freeform 모드)로 간주."""
+    try:
+        from src.common.llm_client import get_llm_provider
+        provider = get_llm_provider()
+        if provider in ("groq", "openai"):
+            return True
+    except Exception:
+        pass
+
+    model = (os.getenv("GROQ_MODEL") or os.getenv("OPENAI_MODEL") or "").lower()
     return (not is_local_endpoint()) and any(h in model for h in _STRONG_HINTS)
 
 

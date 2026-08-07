@@ -111,6 +111,12 @@ class Api:
         if name:
             provider = get_llm_provider()
             if provider == "groq":
+                # 폐기된 모델을 고르면 400 model_decommissioned가 나므로 살아 있는 것만 받는다.
+                from src.common.llm_client import fetch_groq_models
+                live = fetch_groq_models()
+                if live and name not in live:
+                    return dict(list_available_models(),
+                                error=f"'{name}'은(는) Groq에서 더 이상 제공되지 않습니다. 목록을 갱신했습니다.")
                 os.environ["GROQ_MODEL"] = name
             os.environ["OPENAI_MODEL"] = name
             self._chat = None  # 진행 중 대화는 새 모델로 재시작
