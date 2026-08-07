@@ -28,6 +28,50 @@ def extract_slides(pptx_path: str) -> List[List[str]]:
     return slides
 
 
+def extract_slides_rich(pptx_path: str, media_dir: str) -> List[Dict[str, Any]]:
+    """슬라이드별 텍스트 + **삽입된 그림 파일**을 함께 추출.
+
+    텍스트만 읽으면 사용자가 직접 붙여넣은 사진이 통째로 사라지고, "(아래 사진 추가)"
+    같은 문구만 남아 엉뚱한 스톡 이미지로 대체된다.
+    """
+    from pptx import Presentation
+    prs = Presentation(pptx_path)
+    os.makedirs(media_dir, exist_ok=True)
+    EMU = 914400.0
+    out = []
+    for si, s in enumerate(prs.slides, 1):
+        items, images = [], []
+        for sh in s.shapes:
+            top = int(sh.top) if sh.top is not None else 0
+            if sh.shape_type == 13 or sh.__class__.__name__ == "Picture":
+                try:
+                    img = sh.image
+                    p = os.path.join(media_dir, f"s{si}_{len(images)+1}.{img.ext}")
+                    with open(p, "wb") as f:
+                        f.write(img.blob)
+                    images.append({"path": p, "top": top,
+                                   "w": int(sh.width or 0), "h": int(sh.height or 0)})
+                except Exception:
+                    pass
+            elif sh.has_text_frame and sh.text_frame.text.strip():
+                txt = sh.text_frame.text.strip()
+                # "이 영역에 그라데이션" 처럼 위치가 곧 지시인 문구는 도형 좌표를 함께 넘긴다.
+                # 좌표를 버리면 '이 영역'이 어디인지 알 방법이 없어 그냥 무시된다.
+                if _POSITIONAL.search(txt):
+                    txt += (f"  (지시 영역: x={sh.left / EMU:.1f}in, y={sh.top / EMU:.1f}in, "
+                            f"w={sh.width / EMU:.1f}in, h={sh.height / EMU:.1f}in "
+                            f"— 원본 슬라이드 {prs.slide_width / EMU:.1f}x{prs.slide_height / EMU:.1f}in 기준)")
+                items.append((top, txt))
+        items.sort(key=lambda x: x[0])
+        images.sort(key=lambda x: x["top"])
+        out.append({"texts": [t for _, t in items], "images": [i["path"] for i in images]})
+    return out
+
+
+# 위치가 의미를 갖는 디자인 지시 문구
+_POSITIONAL = re.compile(r"영역|여기|이 ?자리|이 ?부분|그라데이션|배경에|사진|이미지|그림")
+
+
 def _slides_to_text(slides):
     return "\n\n".join(f"[슬라이드 {i}]\n" + "\n".join(ts) for i, ts in enumerate(slides, 1) if ts)
 
@@ -80,7 +124,8 @@ _TEMPLATE_RULES = f"""[슬라이드 매핑 — 가장 중요]
 {_DESIGN_RULES}"""
 
 _FREEFORM_RULES = """[설계 위임]
-너는 유능한 발표 디자이너다. 첫 [슬라이드 1]은 표지(title/subtitle)로, 나머지는 각 내용의 성격에 가장 맞는 레이아웃으로 자유롭게 설계하라. 수치는 metrics, 비교는 compare(+도넛), 병렬은 cards, 표는 table, 서술은 text/content를 골라 쓰고, 러프 입력을 풍부하게 확장하라. 디자인 지시 문구는 필드로만 반영하고 텍스트엔 넣지 마라. 이미지 query는 반드시 영어 키워드로. 없는 수치는 지어내지 마라(단 '임의로'라고 하면 허용)."""
+너는 유능한 발표 디자이너다. 첫 [슬라이드 1]은 표지(title/subtitle)로, 나머지는 각 내용의 성격에 가장 맞는 레이아웃으로 자유롭게 설계하라. 수치는 metrics, 비교는 compare(+도넛), 병렬은 cards, 표는 table, 서술은 text/content를 골라 쓰고, 러프 입력을 풍부하게 확장하라. 디자인 지시 문구는 필드로만 반영하고 텍스트엔 넣지 마라. 이미지 query는 반드시 영어 키워드로. 없는 수치는 지어내지 마라(단 '임의로'라고 하면 허용).
+시각적 완성도를 높이기 위해, PLAN(JSON) 최상위(plan)에 `fontScale` (예: 1.1), `titleFont` (예: "Pretendard"), `bodyFont`를 자유롭게 지정해 폰트와 크기를 바꾸고, 본문 내 텍스트는 `{"text": "내용", "emphasis": true}` 형태를 활용하여 핵심을 강조하라."""
 
 
 def _brief_block(brief: str) -> str:
@@ -88,12 +133,12 @@ def _brief_block(brief: str) -> str:
     if not b:
         return ""
     return ("\n[제작자 브리프 — 목적·디렉션·참고자료를 레이아웃 선택·강조·문구에 최대한 반영하라. "
-            "참고자료는 근거로만 쓰고 복붙 금지.]\n" + b[:2500] + "\n")
+            "참고자료는 근거로만 쓰고 복붙 금지.]\n" + b[:30000] + "\n")
 
 
 def interpret_llm(slides, mode: str = "template", brief: str = "") -> Dict[str, Any]:
-    from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "ollama", base_url=os.getenv("OPENAI_BASE_URL"))
+    from src.common.llm_client import get_llm_client_and_model
+    client, model_name = get_llm_client_and_model()
     rules = _TEMPLATE_RULES if mode == "template" else _FREEFORM_RULES
     prompt = f"""너는 감바랩스 발표자료를 설계하는 디자이너다. 사용자가 파워포인트 각 슬라이드에 '내용'과 '디자인 설명'을 적어두었다. 이를 읽고 각 슬라이드에 가장 적합한 레이아웃을 '설계'해 PLAN(JSON)으로 만들어라.
 
@@ -107,7 +152,7 @@ def interpret_llm(slides, mode: str = "template", brief: str = "") -> Dict[str, 
 [변환할 파워포인트 내용]
 {_slides_to_text(slides)}"""
     resp = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o"), temperature=0,
+        model=model_name, temperature=0,
         response_format={"type": "json_object"},
         messages=[{"role": "system", "content": "You output only valid JSON. 한국어 내용은 그대로 보존한다."},
                   {"role": "user", "content": prompt}])
@@ -134,6 +179,14 @@ def _normalize(plan: Dict[str, Any], slides, strict: bool = True) -> Dict[str, A
     if not plan.get("title"):
         plan["title"] = (slides[0][0] if slides and slides[0] else "발표자료")
     plan.setdefault("subtitle", "")
+
+    # Freeform 모드(strict=False)일 경우, 강제 규격화(type 덮어쓰기, 속성 제거)를 
+    # 완전히 우회하여 LLM의 자율적 판단(fontScale, 강조 등)을 온전히 렌더러에 전달한다.
+    if not strict:
+        if not isinstance(plan.get("slides"), list):
+            plan["slides"] = []
+        return plan
+
     out = []
     for sl in (plan.get("slides") or []):
         if not isinstance(sl, dict):

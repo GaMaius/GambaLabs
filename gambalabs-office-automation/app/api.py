@@ -536,12 +536,17 @@ class Api:
             # 강한 모델이면 freeform 엔진(슬라이드 텍스트를 문서로 전달) 시도
             if llm and not design_policy.is_strict():
                 from app.ppt.freeform_engine import generate_freeform_from_slides
+                # 텍스트만 뽑으면 사용자가 넣어둔 사진이 사라진다 → 그림도 함께 추출해 넘긴다.
+                media_dir = os.path.join(OUTPUT, "_images", "import_media")
+                rich = pptx_import.extract_slides_rich(pptx_path, media_dir)
                 slides_text = "\n\n".join(
-                    f"[슬라이드 {i+1}]\n" + "\n".join(ts)
-                    for i, ts in enumerate(pptx_import.extract_slides(pptx_path)) if ts)
+                    f"[슬라이드 {i+1}]\n" + "\n".join(sl["texts"])
+                    for i, sl in enumerate(rich) if sl["texts"])
+                user_images = {i + 1: sl["images"] for i, sl in enumerate(rich) if sl["images"]}
                 generate_freeform_from_slides(
                     slides_text, out, theme=self.theme,
-                    theme_config=self._theme_config(), brief=self._brief_text())
+                    theme_config=self._theme_config(), brief=self._brief_text(),
+                    user_images=user_images)
                 engine = f"AI 자유설계 · {get_llm_client_and_model()[1]}"
                 return {"out": out, "engine": engine}
             
